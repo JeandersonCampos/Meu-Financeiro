@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meu Financeiro</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<meta name="theme-color" content="#1f4d3f">
+<style>
+:root{--bg:#eef1ee;--card:#fff;--ink:#14231f;--mut:#5d6b66;--line:#d9dfdb;--in:#1b7a57;--out:#bf3f2b;--pri:#1f4d3f;--onpri:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#18231f;--ink:#e8efeb;--mut:#93a39c;--line:#2a3a34;--in:#4cc38f;--out:#ff8a73;--pri:#4cc38f;--onpri:#0f1714}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top)}
+main{max-width:640px;margin:0 auto;padding:12px 16px calc(96px + env(safe-area-inset-bottom))}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.nav h1{font-size:1rem;font-weight:600;margin:0;text-transform:capitalize}
+.ic{width:44px;height:44px;border:0;background:none;font-size:1.4rem;border-radius:50%}
+.hero{padding:20px 4px 16px}
+.hero small{color:var(--mut)}
+.hero .big{font-size:2.6rem;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.duo div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.duo small{color:var(--mut);display:block}
+.duo b{font-size:1.15rem}
+.in{color:var(--in)}.out{color:var(--out)}
+.list{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:flex;gap:12px;align-items:center;width:100%;padding:12px 14px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
+.row:last-child{border-bottom:0}
+.row .t{flex:1;min-width:0}
+.row .t b,.row .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t span{color:var(--mut);font-size:.85rem}
+.empty{padding:28px 16px;text-align:center;color:var(--mut)}
+.fab{position:fixed;right:max(16px,calc(50% - 304px));bottom:calc(20px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;border:0;background:var(--pri);color:var(--onpri);font-size:2rem;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+dialog{border:0;border-radius:16px;padding:20px;width:min(440px,calc(100vw - 24px));background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+label{display:block;margin:12px 0 4px;font-size:.9rem;color:var(--mut)}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}
+.seg button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}
+.acts{display:flex;gap:8px;margin-top:18px}
+.acts button{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:none}
+.acts .ok{background:var(--pri);color:var(--onpri);border-color:var(--pri);font-weight:600}
+.acts .del{color:var(--out)}
+#login{max-width:380px;margin:12vh auto 0;padding:0 20px}
+#login h1{font-size:1.6rem;margin:0 0 4px}
+#login p{color:var(--mut);margin:0 0 12px}
+#msg{min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--out)}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;display:none}
+.sair{border:0;background:none;color:var(--mut);margin-top:24px;text-decoration:underline}
+</style>
+</head>
+<body>
+
+<section id="login" hidden>
+  <h1>Meu Financeiro</h1>
+  <p>Entre para ver seus dados em qualquer aparelho.</p>
+  <form id="fl">
+    <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
+    <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
+    <div class="acts"><button type="button" id="cad">Criar conta</button><button class="ok">Entrar</button></div>
+    <div id="msg" role="alert"></div>
+  </form>
+</section>
+
+<main id="app" hidden>
+  <div class="nav">
+    <button class="ic" id="ant" aria-label="Mês anterior">‹</button>
+    <h1 id="mesn"></h1>
+    <button class="ic" id="prox" aria-label="Próximo mês">›</button>
+  </div>
+  <div class="hero"><small>Resultado do mês</small><div class="big num" id="res"></div></div>
+  <div class="duo">
+    <div><small>Entradas</small><b class="in num" id="tin"></b></div>
+    <div><small>Saídas</small><b class="out num" id="tout"></b></div>
+  </div>
+  <div class="list" id="lista"></div>
+  <button class="sair" id="sair">Sair da conta</button>
+</main>
+<button class="fab" id="novo" aria-label="Novo lançamento" hidden>+</button>
+
+<dialog id="dlg">
+  <form id="fd">
+    <div class="seg" role="group" aria-label="Tipo">
+      <button type="button" data-t="saida">Saída</button>
+      <button type="button" data-t="entrada">Entrada</button>
+    </div>
+    <label for="valor">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
+    <label for="data">Data</label><input id="data" type="date" required>
+    <label for="cat">Categoria</label><select id="cat"></select>
+    <label for="desc">Descrição</label><input id="desc" maxlength="120">
+    <div class="acts">
+      <button type="button" id="canc">Cancelar</button>
+      <button type="button" class="del" id="exc">Excluir</button>
+      <button class="ok">Salvar</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// 1) Cole aqui os dados do seu projeto Supabase (Project Settings > API)
+const SUPABASE_URL = https://nkcmkgldvglolsrtzkux.supabase.co;
+const SUPABASE_KEY = sb_publishable_vlKDTMprWAuuOjk-k-cVXg_ifGFNhgH;
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = s => document.querySelector(s);
+const fmt = c => (c / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+const CAT_S = ['Moradia','Mercado','Luz','Água','Internet','Transporte','Gás','Saúde','Educação','Faturas','Dízimo e doações','Assinaturas'];
+const CAT_E = ['Trabalho fixo','Renda extra','Bônus','Pensão','Vendas','Pró-labore'];
+const pad = n => String(n).padStart(2, '0');
+const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const addMes = (m, n) => { const [y, k] = m.split('-').map(Number); const d = new Date(y, k - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
+
+let uid, cats = [], lans = [], mes = hoje().slice(0, 7), editing = null, tipo = 'saida', canal = null;
+
+const key = k => 'cf_' + uid + '_' + k;
+const lerLS = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
+const pend = () => lerLS(key('pend'), []);
+const setPend = p => localStorage.setItem(key('pend'), JSON.stringify(p));
+const queue = row => setPend([...pend().filter(p => p.id !== row.id), row]);
+function toast(t) { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => e.style.display = 'none', 3500); }
+
+// valor "1.234,56" -> centavos inteiros
+function parseValor(s) { const n = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return n > 0 ? Math.round(n * 100) : 0; }
+
+async function loadCats(semear = true) {
+  const { data, error } = await sb.from('categorias').select('*').order('nome');
+  if (error) { cats = lerLS(key('cats'), []); return; }
+  if (!data.length && semear) {
+    await sb.from('categorias').insert([...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))]);
+    return loadCats(false);
+  }
+  cats = data; localStorage.setItem(key('cats'), JSON.stringify(data));
+}
+
+async function loadLans() {
+  const { data, error } = await sb.from('lancamentos').select('*')
+    .gte('data', mes + '-01').lt('data', addMes(mes, 1) + '-01')
+    .order('data', { ascending: false }).order('created_at', { ascending: false });
+  if (error) lans = lerLS(key('l' + mes), []);
+  else { lans = data; localStorage.setItem(key('l' + mes), JSON.stringify(data)); }
+  render();
+}
+
+async function flush() {
+  const p = pend();
+  if (!p.length || !navigator.onLine) return;
+  const { error } = await sb.from('lancamentos').upsert(p);
+  if (!error) { setPend([]); toast('Lançamentos salvos offline foram enviados'); }
+}
+
+function render() {
+  const ids = new Set(pend().map(p => p.id));
+  const todos = [...pend().filter(p => p.data.startsWith(mes)).map(p => ({ ...p, _p: 1 })), ...lans.filter(l => !ids.has(l.id))]
+    .sort((a, b) => b.data.localeCompare(a.data));
+  const soma = t => todos.filter(l => l.tipo === t).reduce((s, l) => s + l.valor_centavos, 0);
+  const e = soma('entrada'), s = soma('saida'), r = e - s;
+  const [y, k] = mes.split('-');
+  $('#mesn').textContent = new Date(y, k - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  $('#tin').textContent = fmt(e); $('#tout').textContent = fmt(s);
+  const re = $('#res'); re.textContent = fmt(r); re.className = 'big num ' + (r < 0 ? 'out' : r > 0 ? 'in' : '');
+  const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
+  const box = $('#lista'); box.textContent = '';
+  if (!todos.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
+  for (const l of todos) {
+    const b = document.createElement('button'); b.className = 'row';
+    const t = document.createElement('div'); t.className = 't';
+    const b1 = document.createElement('b'); b1.textContent = l.descricao || nome(l.categoria_id);
+    const sp = document.createElement('span');
+    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (l._p ? ' · aguardando envio' : '');
+    t.append(b1, sp);
+    const v = document.createElement('div'); v.className = 'num ' + (l.tipo === 'entrada' ? 'in' : 'out');
+    v.textContent = (l.tipo === 'entrada' ? '+ ' : '− ') + fmt(l.valor_centavos);
+    b.append(t, v); b.onclick = () => abrir(l); box.append(b);
+  }
+}
+
+function setTipo(t) {
+  tipo = t;
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t));
+  const sel = $('#cat'), atual = sel.value; sel.textContent = '';
+  for (const c of cats.filter(c => c.tipo === t)) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nome; sel.append(o); }
+  if (atual) sel.value = atual;
+}
+
+function abrir(l) {
+  editing = l || null;
+  $('#valor').value = l ? (l.valor_centavos / 100).toFixed(2).replace('.', ',') : '';
+  $('#data').value = l ? l.data : hoje();
+  $('#desc').value = l?.descricao || '';
+  $('#cat').value = '';
+  setTipo(l ? l.tipo : 'saida');
+  if (l?.categoria_id) $('#cat').value = l.categoria_id;
+  $('#exc').hidden = !l;
+  $('#dlg').showModal();
+}
+
+async function salvar(ev) {
+  ev.preventDefault();
+  const v = parseValor($('#valor').value);
+  if (!v) return toast('Informe um valor maior que zero.');
+  const row = { id: editing?.id || crypto.randomUUID(), tipo, data: $('#data').value, valor_centavos: v,
+    categoria_id: $('#cat').value || null, descricao: $('#desc').value.trim() || null };
+  if (editing && !editing._p) {
+    const { error } = await sb.from('lancamentos').update(row).eq('id', row.id);
+    if (error) return toast('Não foi possível salvar agora. Verifique a conexão e tente de novo.');
+  } else {
+    const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(row) : { error: 1 };
+    if (error) { queue(row); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
+  }
+  $('#dlg').close(); loadLans();
+}
+
+async function excluir() {
+  if (!editing || !confirm('Excluir este lançamento?')) return;
+  if (editing._p) setPend(pend().filter(p => p.id !== editing.id));
+  else {
+    const { error } = await sb.from('lancamentos').delete().eq('id', editing.id);
+    if (error) return toast('Não foi possível excluir agora. Verifique a conexão.');
+  }
+  $('#dlg').close(); loadLans();
+}
+
+function tempoReal() {
+  if (canal) sb.removeChannel(canal);
+  canal = sb.channel('rt')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => loadLans())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); })
+    .subscribe();
+}
+
+async function entrar(user) {
+  uid = user.id;
+  $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
+  await flush(); await loadCats(); await loadLans(); tempoReal();
+}
+
+function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
+
+async function auth(criar) {
+  const f = $('#fl'); if (!f.reportValidity()) return;
+  const cred = { email: $('#em').value.trim(), password: $('#pw').value };
+  const { data, error } = criar ? await sb.auth.signUp(cred) : await sb.auth.signInWithPassword(cred);
+  if (error) { $('#msg').textContent = 'Não foi possível entrar: ' + error.message; return; }
+  if (data.session) { $('#msg').textContent = ''; entrar(data.session.user); }
+  else $('#msg').textContent = 'Conta criada. Confirme pelo e-mail que enviamos e depois toque em Entrar.';
+}
+
+$('#fl').onsubmit = e => { e.preventDefault(); auth(false); };
+$('#cad').onclick = () => auth(true);
+$('#sair').onclick = async () => { await sb.auth.signOut(); sair(); };
+$('#ant').onclick = () => { mes = addMes(mes, -1); loadLans(); };
+$('#prox').onclick = () => { mes = addMes(mes, 1); loadLans(); };
+$('#novo').onclick = () => abrir(null);
+$('#canc').onclick = () => $('#dlg').close();
+$('#exc').onclick = excluir;
+$('#fd').onsubmit = salvar;
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTipo(b.dataset.t));
+window.addEventListener('online', async () => { await flush(); loadLans(); });
+
+(async () => {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  const { data: { session } } = await sb.auth.getSession();
+  session ? entrar(session.user) : sair();
+})();
+</script>
+</body>
+</html>
