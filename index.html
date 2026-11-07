@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 12)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 13)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -110,6 +110,9 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <label for="cn" id="lcn">Conta</label><select id="cn"></select>
     <label for="cat">Categoria</label><select id="cat"></select>
     <label for="desc">Descrição</label><input id="desc" maxlength="120">
+    <label for="cpf">Comprovante (foto ou PDF)</label><input id="cpf" type="file" accept="image/*,application/pdf">
+    <small id="cpinfo" style="display:block;margin-top:6px;color:var(--mut)"></small>
+    <div class="acts" id="cpacts" hidden style="margin-top:8px"><button type="button" id="cpver">Ver comprovante</button><button type="button" class="del" id="cprem">Remover</button></div>
     <small id="ginfo" style="display:block;margin-top:12px;color:var(--mut)"></small>
     <div id="repbox"><label for="rep">Repetição</label><select id="rep"><option value="1">Só uma vez</option><option value="p">Parcelado</option><option value="m">Todo mês (fixo)</option></select>
       <div id="np" hidden><label for="npar">Número de parcelas</label><input id="npar" type="number" min="2" max="60" value="2"></div></div>
@@ -323,7 +326,7 @@ function render() {
     const t = document.createElement('div'); t.className = 't';
     const b1 = document.createElement('b'); b1.textContent = (l.descricao || nome(l.categoria_id)) + (l.parcela_total ? ' (' + l.parcela_n + '/' + l.parcela_total + ')' : '');
     const sp = document.createElement('span');
-    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.cartao_id ? ' · ' + (cartoes.find(k => k.id === l.cartao_id)?.nome || 'cartão') : '') + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
+    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.cartao_id ? ' · ' + (cartoes.find(k => k.id === l.cartao_id)?.nome || 'cartão') : '') + (l.comprovante_path ? ' · 📎' : '') + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
     t.append(b1, sp);
     const v = document.createElement('div'); v.className = 'num ' + (ent ? 'in' : 'out');
     v.textContent = (ent ? '+ ' : '− ') + fmt(l.valor_centavos);
@@ -378,6 +381,7 @@ function abrir(l) {
   $('#exc').hidden = !l;
   $('#repbox').hidden = !!l; $('#rep').value = '1'; $('#rep').onchange();
   $('#ginfo').textContent = l?.parcela_total ? 'Parcela ' + l.parcela_n + ' de ' + l.parcela_total : l?.recorrente ? 'Lançamento fixo mensal' : '';
+  $('#cpf').value = ''; cpRemover = false; cpUI(l);
   $('#dlg').showModal();
 }
 
@@ -387,6 +391,18 @@ async function salvar(ev) {
   if (!v) return toast('Informe um valor maior que zero.');
   const row = { id: editing?.id || crypto.randomUUID(), tipo, data: $('#data').value, valor_centavos: v, status: $('#pc').value ? 'pago' : $('#st').value,
     conta_id: $('#pc').value ? null : ($('#cn').value || null), cartao_id: $('#pc').value || null, categoria_id: $('#cat').value || null, descricao: $('#desc').value.trim() || null };
+  const antigo = editing?.comprovante_path || null, arq = $('#cpf').files[0];
+  if (arq) {
+    if (!navigator.onLine) toast('Sem conexão: o lançamento foi salvo sem o comprovante. Anexe de novo quando estiver online.');
+    else {
+      try {
+        const { blob, ext, ct } = await prepararArquivo(arq), path = uid + '/' + row.id + '.' + ext;
+        const { error } = await sb.storage.from('comprovantes').upload(path, blob, { upsert: true, contentType: ct });
+        if (error) throw error;
+        row.comprovante_path = path;
+      } catch (e) { return toast('Não foi possível enviar o comprovante: ' + (e.message || e)); }
+    }
+  } else if (cpRemover && editing) row.comprovante_path = null;
   if (editing) {
     Object.assign(row, { grupo_id: editing.grupo_id ?? null, parcela_n: editing.parcela_n ?? null, parcela_total: editing.parcela_total ?? null, recorrente: !!editing.recorrente });
     if (editing._p) queue(row);
@@ -403,10 +419,11 @@ async function salvar(ev) {
   } else {
     const r = $('#rep').value, n = r === 'p' ? Math.max(2, Math.min(60, parseInt($('#npar').value) || 2)) : r === 'm' ? 12 : 1, g = n > 1 ? crypto.randomUUID() : null;
     const rows = Array.from({ length: n }, (_, i) => ({ ...row, id: i ? crypto.randomUUID() : row.id, data: dataMais(row.data, i), status: i ? 'pendente' : row.status,
-      grupo_id: g, parcela_n: r === 'p' ? i + 1 : null, parcela_total: r === 'p' ? n : null, recorrente: r === 'm' }));
+      comprovante_path: i ? null : (row.comprovante_path ?? null), grupo_id: g, parcela_n: r === 'p' ? i + 1 : null, parcela_total: r === 'p' ? n : null, recorrente: r === 'm' }));
     const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(rows) : { error: 1 };
     if (error) { rows.forEach(x => queue(x)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
   }
+  if (antigo && row.comprovante_path !== undefined && row.comprovante_path !== antigo) sb.storage.from('comprovantes').remove([antigo]);
   $('#dlg').close(); loadLans();
 }
 
@@ -418,6 +435,8 @@ async function excluir() {
     const { error } = await (tudo ? sb.from('lancamentos').delete().eq('grupo_id', g).gte('data', editing.data) : sb.from('lancamentos').delete().eq('id', editing.id));
     if (error) return toast('Não foi possível excluir agora. Verifique a conexão.');
     if (tudo && editing.recorrente) await sb.from('lancamentos').update({ recorrente: false }).eq('grupo_id', g);
+    const cam = (tudo ? lans.filter(l => l.grupo_id === g && l.data >= editing.data) : [editing]).map(l => l.comprovante_path).filter(Boolean);
+    if (cam.length) sb.storage.from('comprovantes').remove(cam);
   }
   $('#dlg').close(); loadLans();
 }
@@ -521,6 +540,33 @@ function infoBackup() {
 function lembrarBackup() {
   const u = localStorage.getItem('cf_ult_backup');
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
+// ---- comprovantes ----
+let cpRemover = false;
+function cpUI(l) {
+  const tem = !!l?.comprovante_path && !cpRemover;
+  $('#cpacts').hidden = !tem;
+  $('#cpinfo').textContent = cpRemover ? 'O comprovante será removido ao salvar.' : tem ? 'Comprovante anexado. Escolher outro arquivo substitui o atual.' : '';
+}
+async function prepararArquivo(f) {
+  if (f.type === 'application/pdf') {
+    if (f.size > 5e6) throw new Error('o PDF passa de 5 MB');
+    return { blob: f, ext: 'pdf', ct: 'application/pdf' };
+  }
+  let img; try { img = await createImageBitmap(f); } catch { throw new Error('não consegui ler a imagem (use JPG ou PNG)'); }
+  const esc = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+  cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.8));
+  return { blob, ext: 'jpg', ct: 'image/jpeg' };
+}
+async function verComprovante() {
+  if (!editing?.comprovante_path) return;
+  const w = window.open('', '_blank');
+  const { data, error } = await sb.storage.from('comprovantes').createSignedUrl(editing.comprovante_path, 300);
+  if (error || !data) { if (w) w.close(); return toast('Não foi possível abrir o comprovante. Verifique a conexão.'); }
+  if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
 }
 
 // ---- lembretes de vencimento ----
@@ -870,6 +916,8 @@ $('#bmod').onclick = () => baixar('modelo-importacao.csv', '\ufefftipo;data;cate
 $('#bres').onclick = () => { $('#arq').dataset.modo = 'json'; $('#arq').click(); };
 $('#bimp').onclick = () => { $('#arq').dataset.modo = 'csv'; $('#arq').click(); };
 $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.dataset.modo; e.target.value = ''; if (f) await (m === 'json' ? restaurarJson(f) : importarCsv(f)); };
+$('#cpver').onclick = verComprovante;
+$('#cprem').onclick = () => { cpRemover = true; cpUI(editing); };
 $('#lembt').onclick = () => { lembAberto = !($('#lembl').hidden === false); lemb(); };
 $('#bmeta').onclick = () => { editarMeta(null); listarMetas(); $('#dmt').showModal(); };
 $('#mfechar').onclick = () => $('#dmt').close();
