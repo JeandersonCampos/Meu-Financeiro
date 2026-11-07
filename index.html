@@ -103,11 +103,29 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 </dialog>
 <div id="toast" role="status"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // 1) Cole aqui os dados do seu projeto Supabase (Project Settings > API)
-const SUPABASE_URL = https://nkcmkgldvglolsrtzkux.supabase.co;
-const SUPABASE_KEY = sb_publishable_vlKDTMprWAuuOjk-k-cVXg_ifGFNhgH;
+const SUPABASE_URL = 'https://nkcmkgldvglolsrtzkux.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_vlKDTMprWAuuOjk-k-cVXg_ifGFNhgH';
+
+// Mostra o erro na tela (em vez de página em branco)
+function erro(m) {
+  let e = document.getElementById('erro');
+  if (!e) { e = document.createElement('div'); e.id = 'erro'; e.style.cssText = 'margin:16px;padding:14px;border:2px solid #bf3f2b;border-radius:10px;background:#fff;color:#14231f;font:15px/1.4 system-ui'; document.body.prepend(e); }
+  e.textContent = 'Erro: ' + m;
+}
+let parou = false;
+window.addEventListener('error', ev => { if (!parou) erro(ev.message); });
+window.addEventListener('unhandledrejection', ev => { if (!parou) erro(ev.reason?.message || ev.reason); });
+const falha = typeof supabase === 'undefined'
+  ? 'a biblioteca do Supabase não carregou. Verifique a internet e recarregue com Ctrl+F5.'
+  : (SUPABASE_URL.startsWith('COLE_AQUI') || SUPABASE_KEY.startsWith('COLE_AQUI'))
+    ? 'falta colocar a URL e a chave pública do Supabase nas duas primeiras linhas do script do index.html.'
+    : /secret|service_role/i.test(SUPABASE_KEY)
+      ? 'você colocou uma chave secreta. Use somente a chave pública (publishable ou anon).'
+      : '';
+if (falha) { erro(falha); parou = true; throw new Error(falha); }
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
