@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 15)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 16)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -115,7 +115,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div class="acts" id="cpacts" hidden style="margin-top:8px"><button type="button" id="cpver">Ver comprovante</button><button type="button" class="del" id="cprem">Remover</button></div>
     <small id="ginfo" style="display:block;margin-top:12px;color:var(--mut)"></small>
     <div id="repbox"><label for="rep">Repetição</label><select id="rep"><option value="1">Só uma vez</option><option value="p">Parcelado</option><option value="m">Todo mês (fixo)</option></select>
-      <div id="np" hidden><label for="npar">Número de parcelas</label><input id="npar" type="number" min="2" max="60" value="2"></div></div>
+      <div id="np" hidden><label for="npar">Número de parcelas</label><input id="npar" type="number" min="2" max="420" value="2"></div></div>
     <div class="acts">
       <button type="button" id="canc">Cancelar</button>
       <button type="button" class="del" id="exc">Excluir</button>
@@ -186,10 +186,20 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
   <div id="pb"></div>
   <div class="acts"><button type="button" id="pfechar">Fechar</button></div>
 </dialog>
+<dialog id="dpf" style="max-height:94vh;overflow:auto">
+  <h2>Importar fatura (PDF)</h2>
+  <label for="pfc">Cartão</label><select id="pfc"></select>
+  <label for="pfm">Mês de vencimento da fatura</label><input id="pfm" type="month">
+  <label for="pfa">Arquivo PDF da fatura</label><input id="pfa" type="file" accept="application/pdf">
+  <p id="pfs" style="color:var(--mut);font-size:.9rem;margin:10px 0 0">O PDF é lido aqui no seu aparelho e não é enviado para lugar nenhum.</p>
+  <div id="pfl"></div>
+  <div class="acts"><button type="button" id="pfx">Cancelar</button><button type="button" class="ok" id="pfok" disabled>Importar</button></div>
+</dialog>
 <dialog id="dk">
   <form id="fk">
     <h2>Cartões de crédito</h2>
     <div id="lk"></div>
+    <button type="button" class="link" id="bpdf" style="margin:8px 0">Importar fatura (PDF)</button>
     <label for="knome">Nome do cartão</label><input id="knome" maxlength="40" required>
     <label for="kfech">Dia de fechamento</label><input id="kfech" type="number" min="1" max="31" required>
     <label for="kven">Dia de vencimento</label><input id="kven" type="number" min="1" max="31" required>
@@ -425,7 +435,7 @@ async function salvar(ev) {
       }
     }
   } else {
-    const r = $('#rep').value, n = r === 'p' ? Math.max(2, Math.min(60, parseInt($('#npar').value) || 2)) : r === 'm' ? 12 : 1, g = n > 1 ? crypto.randomUUID() : null;
+    const r = $('#rep').value, n = r === 'p' ? Math.max(2, Math.min(420, parseInt($('#npar').value) || 2)) : r === 'm' ? 12 : 1, g = n > 1 ? crypto.randomUUID() : null;
     const rows = Array.from({ length: n }, (_, i) => ({ ...row, id: i ? crypto.randomUUID() : row.id, data: dataMais(row.data, i), status: i ? 'pendente' : row.status,
       comprovante_path: i ? null : (row.comprovante_path ?? null), grupo_id: g, parcela_n: r === 'p' ? i + 1 : null, parcela_total: r === 'p' ? n : null, recorrente: r === 'm' }));
     const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(rows) : { error: 1 };
@@ -548,6 +558,157 @@ function infoBackup() {
 function lembrarBackup() {
   const u = localStorage.getItem('cf_ult_backup');
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
+// ---- importar fatura em PDF ----
+const MES_PT = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
+const RE_VALOR = /(-?\s?(?:R\$)?\s?-?\d{1,3}(?:\.\d{3})*,\d{2})(\s?(?:CR|C))?\s*$/i;
+const RE_PULAR = /(pagamento|pgto|estorno|cr[eé]dito|total|saldo|fatura anterior|limite|vencimento|fechamento|m[ií]nimo|desconto)/i;
+const PALAVRAS = [
+  ['Assinaturas', /netflix|spotify|prime video|amazon prime|disney|hbo|youtube|google|apple|icloud|deezer|globoplay|microsoft|adobe/i],
+  ['Compras diversas', /amazon|mercado ?livre|shopee|magalu|magazine|americanas|aliexpress|kabum/i],
+  ['Mercado', /mercado|supermerc|atacad|carrefour|assa[ií]|hortifruti/i],
+  ['Restaurantes e delivery', /ifood|rappi|restaurante|lanchon|pizz|padaria|burger|mc ?donald|outback|caf[eé]/i],
+  ['Combustível', /posto|shell|ipiranga|petrobras|combust/i],
+  ['Transporte', /uber|99 ?\*|99app|cabify|metr[oô]|sem parar|conectcar|estacionamento/i],
+  ['Farmácia', /farm[aá]c|drog|raia|pacheco|pague menos|panvel/i],
+  ['Celular e telefone', /\bclaro\b|\bvivo\b|\btim\b|\boi\b/i],
+  ['Saúde', /hospital|cl[ií]nica|laborat|dentist|m[eé]dic|unimed/i],
+  ['Educação', /escola|faculdade|curso|udemy|alura|col[eé]gio/i],
+  ['Viagens', /hotel|airbnb|booking|latam|azul|decolar|passagem/i],
+  ['Lazer e entretenimento', /cinema|ingresso|teatro|steam|playstation|xbox|livraria/i],
+  ['Vestuário', /renner|c&a|riachuelo|zara|marisa|shein|cal[cç]ad|moda|roupa/i],
+  ['Pets', /\bpet|veterin|petz|cobasi/i],
+  ['Impostos e taxas', /\biof\b|anuidade|tarifa/i]
+];
+const catPalpite = d => { for (const [n, re] of PALAVRAS) if (re.test(d)) return cats.find(c => c.tipo === 'saida' && c.nome === n)?.id ?? ''; return ''; };
+let pfLinhas = null, pfItens = [], pfIgn = 0, pfTotal = 0;
+
+async function carregarPdfJs() {
+  if (window.pdfjsLib) return;
+  await new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = ok; s.onerror = () => no(new Error('não foi possível carregar o leitor de PDF. Verifique a internet')); document.head.append(s);
+  });
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+async function linhasDoPdf(file) {
+  await carregarPdfJs();
+  const task = pdfjsLib.getDocument({ data: await file.arrayBuffer() });
+  task.onPassword = (ok, motivo) => {
+    const s = prompt(motivo === 2 ? 'Senha incorreta. Digite a senha do PDF de novo:' : 'Este PDF tem senha (em geral, os primeiros dígitos do CPF). Digite a senha:');
+    if (s === null) task.destroy(); else ok(s);
+  };
+  const pdf = await task.promise, out = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const tc = await (await pdf.getPage(n)).getTextContent(), rows = [];
+    for (const it of tc.items) {
+      if (!it.str.trim()) continue;
+      const y = Math.round(it.transform[5]); let r = rows.find(r => Math.abs(r.y - y) <= 2);
+      if (!r) rows.push(r = { y, it: [] });
+      r.it.push({ x: it.transform[4], s: it.str });
+    }
+    rows.sort((a, b) => b.y - a.y).forEach(r => out.push(r.it.sort((a, b) => a.x - b.x).map(i => i.s.trim()).join(' ').replace(/\s+/g, ' ')));
+  }
+  return out;
+}
+function achaVenc(L) {
+  for (let i = 0; i < L.length; i++) {
+    if (!/vencimento/i.test(L[i])) continue;
+    const t = L[i] + ' ' + (L[i + 1] || ''), a = t.match(/(\d{2})\/(\d{2})\/(\d{4})/), b = t.match(/(\d{1,2})\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?\s+(\d{4})/i);
+    if (a) return a[3] + '-' + a[2];
+    if (b) return b[3] + '-' + pad(MES_PT[b[2].toLowerCase()]);
+  }
+  return null;
+}
+function valorDe(s) { return parseValor(s.replace(/R\$|-|\s/g, '')); }
+function parseFatura(L, vencMes, cartaoId) {
+  const [vy, vm] = vencMes.split('-').map(Number), itens = []; let ign = 0, total = 0;
+  for (const linha of L) {
+    if (/total (da|desta|da sua) fatura|total a pagar|valor total/i.test(linha)) { const t = linha.match(RE_VALOR); if (t && !total) total = valorDe(t[1]); }
+    let m = linha.match(/^(\d{2})\/(\d{2})(?:\/(\d{2,4}))?\s+(.*)$/), d, mo, y = null, resto;
+    if (m) { d = +m[1]; mo = +m[2]; if (m[3]) y = m[3].length === 2 ? 2000 + +m[3] : +m[3]; resto = m[4]; }
+    else {
+      m = linha.match(/^(\d{1,2})\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?\s+(.*)$/i);
+      if (!m) continue; d = +m[1]; mo = MES_PT[m[2].toLowerCase()]; resto = m[3];
+    }
+    if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
+    const v = resto.match(RE_VALOR); if (!v) continue;
+    const credito = /^-|-\s?R?\$/.test(v[1].trim()) || /CR|C/i.test((v[2] || '').trim());
+    let desc = resto.replace(RE_VALOR, '').replace(/R\$\s*$/, '').trim();
+    if (credito || RE_PULAR.test(desc)) { ign++; continue; }
+    let pn = null, pt = null;
+    const pm = desc.match(/\(?\b(?:parc(?:ela)?\.?\s*)?(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})\)?\s*$/i) || desc.match(/\bparc(?:ela)?\.?\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i);
+    if (pm && +pm[1] <= +pm[2] && +pm[2] >= 2 && +pm[2] <= 420) { pn = +pm[1]; pt = +pm[2]; desc = desc.replace(pm[0], '').replace(/[-–\s]+$/, '').trim(); }
+    const ano = y ?? (mo > vm ? vy - 1 : vy), data = ano + '-' + pad(mo) + '-' + pad(Math.min(d, new Date(ano, mo, 0).getDate())), valor = valorDe(v[1]);
+    if (!valor) continue;
+    const dup = lans.some(l => l.cartao_id === cartaoId && l.data === data && l.valor_centavos === valor);
+    itens.push({ on: !dup, dup, data, desc, valor, cat: catPalpite(desc), pn, pt });
+  }
+  return { itens, ign, total };
+}
+function pfResumo() {
+  const sel = pfItens.filter(i => i.on), soma = sel.reduce((s, i) => s + i.valor, 0);
+  $('#pfok').disabled = !sel.length; $('#pfok').textContent = sel.length ? 'Importar ' + sel.length + (sel.length === 1 ? ' compra' : ' compras') : 'Importar';
+  if (!pfLinhas) return;
+  $('#pfs').textContent = !pfItens.length
+    ? 'Não encontrei compras neste PDF. Confira se é a fatura em PDF com texto (não uma foto escaneada) e se o mês de vencimento está certo.'
+    : sel.length + ' de ' + pfItens.length + ' compras selecionadas · soma ' + fmt(soma) + (pfTotal ? ' · total da fatura no PDF: ' + fmt(pfTotal) : '') + (pfIgn ? ' · ' + pfIgn + ' linhas ignoradas (pagamentos, créditos e totais)' : '') + '. Confira tudo antes de importar.';
+}
+function pfRender() {
+  const box = $('#pfl'); box.textContent = '';
+  pfItens.forEach(it => {
+    const w = document.createElement('div'); w.style.cssText = 'border-top:1px solid var(--line);padding:10px 0;display:grid;gap:6px';
+    const l1 = document.createElement('div'); l1.style.cssText = 'display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center';
+    const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = it.on; ck.style.cssText = 'width:22px;height:22px'; ck.setAttribute('aria-label', 'Importar esta compra');
+    ck.onchange = () => { it.on = ck.checked; pfResumo(); };
+    const dt = document.createElement('input'); dt.type = 'date'; dt.value = it.data; dt.onchange = () => { it.data = dt.value; };
+    const vl = document.createElement('input'); vl.inputMode = 'decimal'; vl.value = (it.valor / 100).toFixed(2).replace('.', ',');
+    vl.onchange = () => { it.valor = parseValor(vl.value) || it.valor; vl.value = (it.valor / 100).toFixed(2).replace('.', ','); pfResumo(); };
+    l1.append(ck, dt, vl);
+    const ds = document.createElement('input'); ds.maxLength = 120; ds.value = it.desc; ds.oninput = () => { it.desc = ds.value; };
+    const ct = document.createElement('select');
+    for (const [v, n] of [['', 'Sem categoria'], ...cats.filter(c => c.tipo === 'saida').map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; ct.append(o); }
+    ct.value = it.cat; ct.onchange = () => { it.cat = ct.value; };
+    w.append(l1, ds, ct);
+    const nota = [it.pt ? 'Parcela ' + it.pn + ' de ' + it.pt : '', it.dup ? 'Já existe um lançamento igual neste cartão (desmarcado).' : ''].filter(Boolean).join(' · ');
+    if (nota) { const s = document.createElement('small'); s.style.color = it.dup ? 'var(--warn)' : 'var(--mut)'; s.textContent = nota; w.append(s); }
+    box.append(w);
+  });
+  pfResumo();
+}
+function pfParse() {
+  if (!pfLinhas) return;
+  const r = parseFatura(pfLinhas, $('#pfm').value || hoje().slice(0, 7), $('#pfc').value);
+  pfItens = r.itens; pfIgn = r.ign; pfTotal = r.total; pfRender();
+}
+async function pfArquivo(f) {
+  if (!f) return;
+  $('#pfs').textContent = 'Lendo o PDF…'; $('#pfl').textContent = ''; pfLinhas = null; pfItens = []; pfResumo();
+  try { pfLinhas = await linhasDoPdf(f); } catch (e) { $('#pfs').textContent = ''; return toast('Não foi possível ler o PDF: ' + (e.message || e)); }
+  if (!pfLinhas.length) { $('#pfs').textContent = 'Este PDF não tem texto (parece uma foto escaneada), então não consigo ler.'; return; }
+  const v = achaVenc(pfLinhas); if (v) $('#pfm').value = v;
+  pfParse();
+}
+async function pfImportar() {
+  const c = cartoes.find(x => x.id === $('#pfc').value); if (!c) return toast('Escolha o cartão.');
+  const rows = pfItens.filter(i => i.on && i.valor > 0 && i.data).map(i => ({ id: crypto.randomUUID(), tipo: 'saida', data: i.data, valor_centavos: i.valor, status: 'pago', conta_id: null,
+    cartao_id: c.id, categoria_id: i.cat || null, descricao: i.desc.trim() || null, parcela_n: i.pn, parcela_total: i.pt }));
+  if (!rows.length) return;
+  if (!navigator.onLine) { rows.forEach(r => queue(r)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
+  else {
+    const { error } = await sb.from('lancamentos').insert(rows);
+    if (error) return toast('Não foi possível importar: ' + error.message);
+    toast(rows.length + ' compras importadas.');
+  }
+  $('#dpf').close(); loadLans();
+}
+function abrirImportacao() {
+  if (!cartoes.length) return toast('Cadastre um cartão primeiro.');
+  $('#dk').close(); pfLinhas = null; pfItens = []; $('#pfl').textContent = ''; $('#pfa').value = ''; $('#pfm').value = hoje().slice(0, 7);
+  const s = $('#pfc'); s.textContent = '';
+  for (const c of cartoes) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nome; s.append(o); }
+  $('#pfs').textContent = 'O PDF é lido aqui no seu aparelho e não é enviado para lugar nenhum.'; pfResumo(); $('#dpf').showModal();
 }
 
 // ---- gerenciar categorias ----
@@ -973,6 +1134,12 @@ $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.data
 $('#cpver').onclick = verComprovante;
 $('#cprem').onclick = () => { cpRemover = true; cpUI(editing); };
 $('#lembt').onclick = () => { lembAberto = !($('#lembl').hidden === false); lemb(); };
+$('#bpdf').onclick = abrirImportacao;
+$('#pfa').onchange = e => pfArquivo(e.target.files[0]);
+$('#pfm').onchange = pfParse;
+$('#pfc').onchange = pfParse;
+$('#pfx').onclick = () => $('#dpf').close();
+$('#pfok').onclick = pfImportar;
 $('#bcat2').onclick = () => { ctTipo = 'saida'; editarCat(null); listarCat(); $('#dct').showModal(); };
 $('#ctfechar').onclick = () => $('#dct').close();
 $('#ctexc').onclick = excluirCat;
