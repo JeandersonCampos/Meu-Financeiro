@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 17)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 18)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -564,7 +564,8 @@ function lembrarBackup() {
 
 // ---- importar fatura em PDF ----
 const MES_PT = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
-const RE_VALOR = /(-?\s?(?:R\$)?\s?-?\d[\d.]*,\d{2})(\s?(?:CR|C))?\s*$/i;
+const RE_VALOR = /(-?\s?(?:R\$)?\s?-?\d[\d.]*,\d{2})(\s?(?:CR|C|D))?\s*$/i;
+const RE_TAXA = /^(anuidade|tarifa|seguro|iof|juros|multa|encargos?)\b/i;
 const RE_PULAR = /(pagamento|pgto|estorno|cr[eé]dito|total|saldo|fatura anterior|limite|vencimento|fechamento|m[ií]nimo|desconto)/i;
 const PALAVRAS = [
   ['Assinaturas', /netflix|spotify|prime video|amazon prime|disney|hbo|youtube|google|apple|icloud|deezer|globoplay|microsoft|adobe/i],
@@ -584,7 +585,7 @@ const PALAVRAS = [
   ['Impostos e taxas', /\biof\b|anuidade|tarifa/i]
 ];
 const catPalpite = d => { for (const [n, re] of PALAVRAS) if (re.test(d)) return cats.find(c => c.tipo === 'saida' && c.nome === n)?.id ?? ''; return ''; };
-let pfLinhas = null, pfItens = [], pfIgn = 0, pfTotal = 0, pfVer = false;
+let pfLinhas = null, pfItens = [], pfIgn = 0, pfTotal = 0, pfCred = 0, pfVer = false, pfFech = '', pfRef = null;
 
 async function carregarPdfJs() {
   if (window.pdfjsLib) return;
@@ -596,14 +597,17 @@ async function carregarPdfJs() {
 }
 async function linhasDoPdf(file) {
   await carregarPdfJs();
-  const task = pdfjsLib.getDocument({ data: await file.arrayBuffer() });
+  const base = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+  const task = pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), standardFontDataUrl: base + 'standard_fonts/', cMapUrl: base + 'cmaps/', cMapPacked: true,
+    disableFontFace: true, useSystemFonts: false, isEvalSupported: false, disableAutoFetch: true, disableStream: true, verbosity: 0 });
   task.onPassword = (ok, motivo) => {
     const s = prompt(motivo === 2 ? 'Senha incorreta. Digite a senha do PDF de novo:' : 'Este PDF tem senha (em geral, os primeiros dígitos do CPF). Digite a senha:');
     if (s === null) task.destroy(); else ok(s);
   };
   const pdf = await task.promise, out = [];
   for (let n = 1; n <= pdf.numPages; n++) {
-    const tc = await (await pdf.getPage(n)).getTextContent(), rows = [];
+    const pg = await pdf.getPage(n), tc = await pg.getTextContent(), rows = [];
+    pg.cleanup();
     for (const it of tc.items) {
       if (!it.str || !it.str.trim()) continue;
       const y = it.transform[5]; let r = rows.find(r => Math.abs(r.y - y) <= 3);
@@ -619,6 +623,7 @@ async function linhasDoPdf(file) {
       out.push(t.replace(/[\u00a0\u2007\u202f]/g, ' ').replace(/[\u2212\u2013]/g, '-').replace(/\s+/g, ' ').trim());
     });
   }
+  await pdf.destroy();
   return out.filter(Boolean);
 }
 function achaVenc(L) {
@@ -633,15 +638,42 @@ function achaVenc(L) {
 function valorDe(s) { return parseValor(s.replace(/R\$|-|\s/g, '')); }
 const RE_D1 = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+(.*)$/;
 const RE_D2 = /^(\d{1,2})\s+(?:de\s+)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?(?:\s+(?:de\s+)?(\d{4}))?\s+(.*)$/i;
-function parseFatura(L, vencMes, cartaoId) {
-  const [vy, vm] = vencMes.split('-').map(Number), itens = []; let ign = 0, total = 0;
+function dataFechamento(L, vencMes, c) {
+  for (const l of L) { const m = l.match(/fechamento[^0-9]{0,20}(\d{2})\/(\d{2})\/(\d{4})/i); if (m) return m[3] + '-' + m[2] + '-' + m[1]; }
+  if (!c) return vencMes + '-01';
+  const ref = c.dia_vencimento > c.dia_fechamento ? vencMes : addMes(vencMes, -1);
+  return ref + '-' + pad(Math.min(c.dia_fechamento, new Date(+ref.slice(0, 4), +ref.slice(5, 7), 0).getDate()));
+}
+function parseFatura(L, vencMes, cartaoId, dataFech) {
+  const [vy, vm] = vencMes.split('-').map(Number), itens = []; let ign = 0, tg = 0, tf = 0, cred = 0;
+  const tirarParcela = d => {
+    const pm = d.match(/\(?\b(?:parc(?:ela)?\.?\s*)?(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})\)?\s*$/i) || d.match(/parc(?:ela)?\.?\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i) || d.match(/\b(\d{1,3})\s+de\s+(\d{1,3})\b/i);
+    if (pm && +pm[1] <= +pm[2] && +pm[2] >= 2 && +pm[2] <= 420) return { pn: +pm[1], pt: +pm[2], desc: d.replace(pm[0], ' ').replace(/\s+/g, ' ').replace(/[-–\s]+$/, '').trim() };
+    return { pn: null, pt: null, desc: d.replace(/\s+/g, ' ').trim() };
+  };
+  const novo = (data, desc, valor, extra) => {
+    const dup = lans.some(l => l.cartao_id === cartaoId && l.data === data && l.valor_centavos === valor), t = tirarParcela(desc);
+    itens.push({ on: !dup, dup, data, desc: t.desc, valor, cat: catPalpite(t.desc), pn: t.pn, pt: t.pt, ...extra });
+  };
   for (let i = 0; i < L.length; i++) {
     const linha = L[i].replace(/[\u2212\u2013]/g, '-');
-    if (/total (da|desta|da sua) fatura|total a pagar|valor total/i.test(linha)) { const t = linha.match(RE_VALOR); if (t && !total) total = valorDe(t[1]); }
+    const tv = linha.match(RE_VALOR);
+    if (tv && !/anterior/i.test(linha)) {
+      if (/total geral dos lan[cç]amentos/i.test(linha) && !tg) tg = valorDe(tv[1]);
+      else if (/total (da|desta|da sua) fatura|total a pagar/i.test(linha) && !tf) tf = valorDe(tv[1]);
+    }
     let m = linha.match(RE_D1), d, mo, y = null, resto;
     if (m) { d = +m[1]; mo = +m[2]; if (m[3]) y = m[3].length === 2 ? 2000 + +m[3] : +m[3]; resto = m[4]; }
     else {
-      m = linha.match(RE_D2); if (!m) continue;
+      m = linha.match(RE_D2);
+      if (!m) {
+        // taxas sem data na fatura (anuidade, IOF, juros...): usa a data de fechamento
+        if (tv && RE_TAXA.test(linha) && !linha.includes('%') && !/\bR\$\s*[\d.]*,\d{2}\s+R\$/.test(linha)) {
+          const v0 = valorDe(tv[1]), cr0 = /^-|-\s?R?\$/.test(tv[1].trim()) || /CR|C/i.test((tv[2] || '').trim());
+          if (v0 && !cr0) novo(dataFech, linha.replace(RE_VALOR, '').replace(/R\$\s*$/, '').trim(), v0, { semData: true });
+        }
+        continue;
+      }
       d = +m[1]; mo = MES_PT[m[2].toLowerCase()]; if (m[3]) y = +m[3]; resto = m[4];
     }
     if (d < 1 || d > 31 || mo < 1 || mo > 12) continue;
@@ -649,17 +681,13 @@ function parseFatura(L, vencMes, cartaoId) {
     if (!v && L[i + 1] && !RE_D1.test(L[i + 1]) && !RE_D2.test(L[i + 1])) { resto += ' ' + L[i + 1]; v = resto.match(RE_VALOR); }
     if (!v) continue;
     const credito = /^-|-\s?R?\$/.test(v[1].trim()) || /CR|C/i.test((v[2] || '').trim());
-    let desc = resto.replace(RE_VALOR, '').replace(/R\$\s*$/, '').replace(/^[•*·]{2,}\s*\d{4}\s+/, '').trim();
-    if (credito || RE_PULAR.test(desc)) { ign++; continue; }
-    let pn = null, pt = null;
-    const pm = desc.match(/\(?\b(?:parc(?:ela)?\.?\s*)?(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})\)?\s*$/i) || desc.match(/\bparc(?:ela)?\.?\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})/i);
-    if (pm && +pm[1] <= +pm[2] && +pm[2] >= 2 && +pm[2] <= 420) { pn = +pm[1]; pt = +pm[2]; desc = desc.replace(pm[0], '').replace(/[-–\s]+$/, '').trim(); }
-    const ano = y ?? (mo > vm ? vy - 1 : vy), data = ano + '-' + pad(mo) + '-' + pad(Math.min(d, new Date(ano, mo, 0).getDate())), valor = valorDe(v[1]);
+    const desc = resto.replace(RE_VALOR, '').replace(/R\$\s*$/, '').replace(/^[•*·]{2,}\s*\d{4}\s+/, '').trim(), valor = valorDe(v[1]);
+    if (credito || RE_PULAR.test(desc)) { ign++; if (credito && valor && !/pagamento|obrigado|anterior/i.test(desc)) cred += valor; continue; }
     if (!valor) continue;
-    const dup = lans.some(l => l.cartao_id === cartaoId && l.data === data && l.valor_centavos === valor);
-    itens.push({ on: !dup, dup, data, desc, valor, cat: catPalpite(desc), pn, pt });
+    const ano = y ?? (mo > vm ? vy - 1 : vy), data = ano + '-' + pad(mo) + '-' + pad(Math.min(d, new Date(ano, mo, 0).getDate()));
+    novo(data, desc, valor);
   }
-  return { itens, ign, total };
+  return { itens, ign, total: tg || tf, cred };
 }
 function pfResumo() {
   const sel = pfItens.filter(i => i.on), soma = sel.reduce((s, i) => s + i.valor, 0);
@@ -670,10 +698,11 @@ function pfResumo() {
   if (!pfLinhas) return;
   $('#pfs').textContent = !pfItens.length
     ? 'Não encontrei compras neste PDF. Abaixo estão as linhas com valores que consegui ler. Se elas não mostram as suas compras, me mande uma captura delas, trocando nomes e valores por exemplos.'
-    : sel.length + ' de ' + pfItens.length + ' compras selecionadas · soma ' + fmt(soma) + (pfTotal ? ' · total da fatura no PDF: ' + fmt(pfTotal) : '') + (pfIgn ? ' · ' + pfIgn + ' linhas ignoradas (pagamentos, créditos e totais)' : '') + '. Confira tudo antes de importar.';
+    : sel.length + ' de ' + pfItens.length + ' compras selecionadas · soma ' + fmt(soma) + (pfCred ? ' − créditos ' + fmt(pfCred) + ' = ' + fmt(soma - pfCred) : '') + (pfTotal ? ' · total no PDF: ' + fmt(pfTotal) + (Math.abs(soma - pfCred - pfTotal) < 1 ? ' ✓ confere' : ' (não bate: confira as linhas)') : '') + (pfIgn ? ' · ' + pfIgn + ' linhas ignoradas (pagamentos e créditos)' : '') + '.';
 }
 function pfRender() {
   const box = $('#pfl'); box.textContent = '';
+  const cAtual = cartoes.find(x => x.id === $('#pfc').value);
   pfItens.forEach(it => {
     const w = document.createElement('div'); w.style.cssText = 'border-top:1px solid var(--line);padding:10px 0;display:grid;gap:6px';
     const l1 = document.createElement('div'); l1.style.cssText = 'display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center';
@@ -688,7 +717,7 @@ function pfRender() {
     for (const [v, n] of [['', 'Sem categoria'], ...cats.filter(c => c.tipo === 'saida').map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; ct.append(o); }
     ct.value = it.cat; ct.onchange = () => { it.cat = ct.value; };
     w.append(l1, ds, ct);
-    const nota = [it.pt ? 'Parcela ' + it.pn + ' de ' + it.pt : '', it.dup ? 'Já existe um lançamento igual neste cartão (desmarcado).' : ''].filter(Boolean).join(' · ');
+    const nota = [it.pt ? 'Parcela ' + it.pn + ' de ' + it.pt : '', it.semData ? 'Sem data na fatura: usei a data de fechamento.' : '', (cAtual && pfRef && it.data && cicloFatura(cAtual, it.data).ref !== pfRef) ? 'A data original cai em outra fatura. Vou registrar em ' + pfFech.split('-').reverse().slice(0, 2).join('/') + ' (fechamento) para entrar nesta fatura.' : '', it.dup ? 'Já existe um lançamento igual neste cartão (desmarcado).' : ''].filter(Boolean).join(' · ');
     if (nota) { const s = document.createElement('small'); s.style.color = it.dup ? 'var(--warn)' : 'var(--mut)'; s.textContent = nota; w.append(s); }
     box.append(w);
   });
@@ -696,8 +725,10 @@ function pfRender() {
 }
 function pfParse() {
   if (!pfLinhas) return;
-  const r = parseFatura(pfLinhas, $('#pfm').value || hoje().slice(0, 7), $('#pfc').value);
-  pfItens = r.itens; pfIgn = r.ign; pfTotal = r.total; pfRender();
+  const vm = $('#pfm').value || hoje().slice(0, 7), c = cartoes.find(x => x.id === $('#pfc').value);
+  const r = parseFatura(pfLinhas, vm, $('#pfc').value, dataFechamento(pfLinhas, vm, c));
+  pfFech = dataFechamento(pfLinhas, vm, c); pfRef = c ? cicloFatura(c, pfFech).ref : null;
+  pfItens = r.itens; pfIgn = r.ign; pfTotal = r.total; pfCred = r.cred; pfRender();
 }
 async function pfArquivo(f) {
   if (!f) return;
@@ -709,8 +740,11 @@ async function pfArquivo(f) {
 }
 async function pfImportar() {
   const c = cartoes.find(x => x.id === $('#pfc').value); if (!c) return toast('Escolha o cartão.');
-  const rows = pfItens.filter(i => i.on && i.valor > 0 && i.data).map(i => ({ id: crypto.randomUUID(), tipo: 'saida', data: i.data, valor_centavos: i.valor, status: 'pago', conta_id: null,
-    cartao_id: c.id, categoria_id: i.cat || null, descricao: i.desc.trim() || null, parcela_n: i.pn, parcela_total: i.pt }));
+  const rows = pfItens.filter(i => i.on && i.valor > 0 && i.data).map(i => {
+    const fora = pfRef && cicloFatura(c, i.data).ref !== pfRef, orig = i.data.split('-').reverse().slice(0, 2).join('/');
+    return { id: crypto.randomUUID(), tipo: 'saida', data: fora ? pfFech : i.data, valor_centavos: i.valor, status: 'pago', conta_id: null,
+      cartao_id: c.id, categoria_id: i.cat || null, descricao: ((i.desc.trim() || 'Compra') + (fora ? ' (compra em ' + orig + ')' : '')), parcela_n: i.pn, parcela_total: i.pt };
+  });
   if (!rows.length) return;
   if (!navigator.onLine) { rows.forEach(r => queue(r)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
   else {
