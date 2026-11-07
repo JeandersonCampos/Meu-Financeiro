@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 13)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 14)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -554,12 +554,22 @@ async function prepararArquivo(f) {
     if (f.size > 5e6) throw new Error('o PDF passa de 5 MB');
     return { blob: f, ext: 'pdf', ct: 'application/pdf' };
   }
-  let img; try { img = await createImageBitmap(f); } catch { throw new Error('não consegui ler a imagem (use JPG ou PNG)'); }
-  const esc = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
-  cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
-  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.8));
-  return { blob, ext: 'jpg', ct: 'image/jpeg' };
+  try {
+    // fotos grandes da câmera são reduzidas já na leitura, para não estourar a memória do celular
+    const img = await createImageBitmap(f, f.size > 1.5e6 ? { resizeWidth: 1600, resizeQuality: 'medium' } : undefined);
+    const esc = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    img.close();
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.8));
+    cv.width = cv.height = 0;
+    if (!blob) throw new Error('sem blob');
+    return { blob, ext: 'jpg', ct: 'image/jpeg' };
+  } catch {
+    // plano B: envia o arquivo original se ele já for pequeno
+    if (f.size <= 5e6 && /^image\/(jpeg|png|webp)$/.test(f.type)) return { blob: f, ext: f.type.split('/')[1].replace('jpeg', 'jpg'), ct: f.type };
+    throw new Error('a imagem é grande demais para este aparelho. Tire a foto em resolução menor ou use um PDF');
+  }
 }
 async function verComprovante() {
   if (!editing?.comprovante_path) return;
