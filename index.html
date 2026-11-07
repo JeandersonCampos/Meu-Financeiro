@@ -29,7 +29,7 @@ button{cursor:pointer}
 .duo b{font-size:1.15rem}
 .in{color:var(--in)}.out{color:var(--out)}
 .list{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
+.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.br{margin:8px 0}.bt{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}.tr{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px}.tr div{height:100%}.tr .o{background:var(--out)}.tr .i{background:var(--in)}.tr .c{background:var(--pri)}dialog h3{font-size:1rem;margin:20px 0 6px}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg2 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg2 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
 .row:last-child{border-bottom:0}.pend .t b{font-style:italic}
 .row .t{flex:1;min-width:0}
 .row .t b,.row .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -59,7 +59,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 6)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 7)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -83,7 +83,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;gap:20px"><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button></div>
+  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button></div>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
   <button class="sair" id="sair">Sair da conta</button>
@@ -121,6 +121,12 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <label for="csal">Saldo inicial (R$)</label><input id="csal" inputmode="decimal" placeholder="0,00">
     <div class="acts"><button type="button" id="cfechar">Fechar</button><button type="button" class="del" id="cexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dpn" style="max-height:92vh;overflow:auto">
+  <div class="nav"><button class="ic" id="pant" aria-label="Período anterior">‹</button><h2 id="ptit" style="margin:0;text-transform:capitalize"></h2><button class="ic" id="pprox" aria-label="Próximo período">›</button></div>
+  <div class="seg2" role="group" aria-label="Período"><button type="button" data-p="m">Mês</button><button type="button" data-p="a">Ano</button></div>
+  <div id="pb"></div>
+  <div class="acts"><button type="button" id="pfechar">Fechar</button></div>
 </dialog>
 <dialog id="dk">
   <form id="fk">
@@ -213,7 +219,7 @@ async function loadLans() {
     all = all.concat(data); if (data.length < 1000) break; de += 1000;
   }
   if (falhou) lans = lerLS(key('all'), []); else { lans = all; localStorage.setItem(key('all'), JSON.stringify(all)); }
-  render();
+  render(); if ($('#dpn').open) painel();
   if (!falhou) sincronizarFaturas();
 }
 
@@ -374,6 +380,75 @@ async function gerarFixos() {
   if (novos.length) { await sb.from('lancamentos').upsert(novos, { onConflict: 'grupo_id,data', ignoreDuplicates: true }); await loadLans(); }
 }
 
+// ---- painéis ----
+let aba = 'm';
+const rotMes = m => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+const nomeCat = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
+function rank(arr, chave) {
+  const m = {}; for (const l of arr) { const k = chave(l); m[k] = (m[k] || 0) + l.valor_centavos; }
+  return Object.entries(m).map(([n, v]) => ({ n, v })).sort((a, b) => b.v - a.v);
+}
+function barras(tit, itens, cls) {
+  const s = document.createElement('section'), h3 = document.createElement('h3'); h3.textContent = tit; s.append(h3);
+  if (!itens.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Sem dados neste período.'; s.append(p); return s; }
+  const top = itens.slice(0, 7), resto = itens.slice(7).reduce((a, b) => a + b.v, 0); if (resto) top.push({ n: 'Outras', v: resto });
+  const max = Math.max(...top.map(i => i.v)), tot = itens.reduce((a, b) => a + b.v, 0);
+  for (const i of top) {
+    const r = document.createElement('div'); r.className = 'br';
+    const a = document.createElement('div'); a.className = 'bt';
+    const n = document.createElement('span'); n.textContent = i.n;
+    const v = document.createElement('span'); v.className = 'num'; v.textContent = fmt(i.v) + ' · ' + Math.round(i.v / tot * 100) + '%'; a.append(n, v);
+    const t = document.createElement('div'); t.className = 'tr'; const f = document.createElement('div'); f.className = cls; f.style.width = (i.v / max * 100) + '%'; t.append(f);
+    r.append(a, t); s.append(r);
+  }
+  return s;
+}
+const MESES = 'JFMAMJJASOND'.split('');
+function svgAnual(ent, sai) {
+  const max = Math.max(1, ...ent, ...sai), W = 360, H = 170, pb = 18, gw = W / 12;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Entradas e saídas por mês" style="width:100%">';
+  MESES.forEach((c, i) => {
+    const hi = ent[i] / max * (H - pb - 6), ho = sai[i] / max * (H - pb - 6), x = i * gw + 3;
+    s += '<rect x="' + x + '" y="' + (H - pb - hi) + '" width="' + (gw / 2 - 3) + '" height="' + hi + '" fill="var(--in)"/>'
+      + '<rect x="' + (x + gw / 2 - 2) + '" y="' + (H - pb - ho) + '" width="' + (gw / 2 - 3) + '" height="' + ho + '" fill="var(--out)"/>'
+      + '<text x="' + (i * gw + gw / 2) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" fill="var(--mut)">' + c + '</text>';
+  });
+  return s + '</svg>';
+}
+function svgSaldo(saldo) {
+  const W = 360, H = 170, pb = 18, lo = Math.min(0, ...saldo), hi = Math.max(0, ...saldo, lo + 1), gw = W / 12;
+  const y = v => 14 + (hi - v) / (hi - lo) * (H - pb - 20), x = i => i * gw + gw / 2;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Saldo previsto por mês" style="width:100%">'
+    + '<line x1="0" x2="' + W + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="var(--line)" stroke-dasharray="4"/>'
+    + '<polyline fill="none" stroke="var(--pri)" stroke-width="2.5" points="' + saldo.map((v, i) => x(i) + ',' + y(v)).join(' ') + '"/>'
+    + saldo.map((v, i) => '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3" fill="var(--pri)"/>').join('')
+    + '<text x="2" y="10" font-size="10" fill="var(--mut)">' + fmt(hi) + '</text>'
+    + (lo < 0 ? '<text x="2" y="' + (H - pb - 2) + '" font-size="10" fill="var(--mut)">' + fmt(lo) + '</text>' : '');
+  MESES.forEach((c, i) => s += '<text x="' + x(i) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" fill="var(--mut)">' + c + '</text>');
+  return s + '</svg>';
+}
+function painel() {
+  document.querySelectorAll('.seg2 button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === aba));
+  const TA = todas(), T = TA.filter(l => !l.cartao_id), pre = aba === 'm' ? mes : mes.slice(0, 4), box = $('#pb');
+  $('#ptit').textContent = aba === 'm' ? rotMes(mes) : mes.slice(0, 4);
+  const P = TA.filter(l => l.data.startsWith(pre)), kn = id => cartoes.find(c => c.id === id)?.nome || 'Cartão';
+  const gastos = P.filter(l => l.tipo === 'saida' && !l.fatura_de), compras = P.filter(l => l.cartao_id);
+  box.textContent = '';
+  if (aba === 'a') {
+    const ano = mes.slice(0, 4), meses = MESES.map((_, i) => ano + '-' + pad(i + 1));
+    const ent = meses.map(m => soma(T, l => l.tipo === 'entrada' && l.data.startsWith(m))), sai = meses.map(m => soma(T, l => l.tipo === 'saida' && l.data.startsWith(m)));
+    let ac = contas.reduce((s, c) => s + c.saldo_inicial_centavos, 0) + val(T, l => l.data < ano + '-01-01');
+    const saldo = meses.map((m, i) => (ac += ent[i] - sai[i]));
+    const d = document.createElement('div');
+    d.innerHTML = '<h3>Entradas × saídas por mês</h3>' + svgAnual(ent, sai) + '<small style="color:var(--mut)">Verde: entradas. Vermelho: saídas (a fatura conta no vencimento).</small><h3>Saldo previsto no fim de cada mês</h3>' + svgSaldo(saldo);
+    box.append(d);
+  }
+  box.append(barras('Gastos por categoria', rank(gastos, l => nomeCat(l.categoria_id)), 'o'),
+    barras('Entradas por categoria', rank(P.filter(l => l.tipo === 'entrada'), l => nomeCat(l.categoria_id)), 'i'),
+    barras('Compras por cartão', rank(compras, l => kn(l.cartao_id)), 'c'));
+}
+function mudarPeriodo(n) { mes = addMes(mes, aba === 'm' ? n : 12 * n); render(); painel(); }
+
 // ---- cartões e faturas ----
 // compra até o dia do fechamento entra na fatura do mês; depois, na seguinte
 function cicloFatura(c, data) {
@@ -508,6 +583,11 @@ $('#ant').onclick = () => { mes = addMes(mes, -1); render(); };
 $('#prox').onclick = () => { mes = addMes(mes, 1); render(); };
 $('#bcontas').onclick = () => { editarConta(null); listarContas(); $('#dc').showModal(); };
 $('#cfechar').onclick = () => $('#dc').close();
+$('#bpain').onclick = () => { painel(); $('#dpn').showModal(); };
+$('#pfechar').onclick = () => $('#dpn').close();
+$('#pant').onclick = () => mudarPeriodo(-1);
+$('#pprox').onclick = () => mudarPeriodo(1);
+document.querySelectorAll('.seg2 button').forEach(b => b.onclick = () => { aba = b.dataset.p; painel(); });
 $('#bcart').onclick = () => { editarCartao(null); listarCartoes(); $('#dk').showModal(); };
 $('#kfechar').onclick = () => $('#dk').close();
 $('#kexc').onclick = excluirCartao;
