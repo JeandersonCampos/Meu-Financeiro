@@ -6,6 +6,7 @@
 <title>Meu Financeiro</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#1f4d3f">
 <style>
 :root{--bg:#eef1ee;--card:#fff;--ink:#14231f;--mut:#5d6b66;--line:#d9dfdb;--in:#1b7a57;--out:#bf3f2b;--pri:#1f4d3f;--onpri:#fff}
@@ -59,7 +60,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 7)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 8)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -83,7 +84,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button></div>
+  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
   <button class="sair" id="sair">Sair da conta</button>
@@ -121,6 +122,19 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <label for="csal">Saldo inicial (R$)</label><input id="csal" inputmode="decimal" placeholder="0,00">
     <div class="acts"><button type="button" id="cfechar">Fechar</button><button type="button" class="del" id="cexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dbk">
+  <h2>Backup e importação</h2>
+  <p id="bkinfo" style="color:var(--mut);font-size:.9rem;margin:0 0 8px"></p>
+  <div class="acts" style="flex-direction:column">
+    <button type="button" id="bexp">Baixar backup (JSON)</button>
+    <button type="button" id="bres">Restaurar backup (JSON)</button>
+    <button type="button" id="bcsv">Baixar lançamentos (CSV para Excel)</button>
+    <button type="button" id="bimp">Importar lançamentos (CSV)</button>
+    <button type="button" id="bmod">Baixar modelo de CSV</button>
+    <button type="button" id="bkfechar">Fechar</button>
+  </div>
+  <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
 </dialog>
 <dialog id="dpn" style="max-height:92vh;overflow:auto">
   <div class="nav"><button class="ic" id="pant" aria-label="Período anterior">‹</button><h2 id="ptit" style="margin:0;text-transform:capitalize"></h2><button class="ic" id="pprox" aria-label="Próximo período">›</button></div>
@@ -380,6 +394,83 @@ async function gerarFixos() {
   if (novos.length) { await sb.from('lancamentos').upsert(novos, { onConflict: 'grupo_id,data', ignoreDuplicates: true }); await loadLans(); }
 }
 
+// ---- backup e importação ----
+function baixar(nome, txt, tipo) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: tipo + ';charset=utf-8' })); a.download = nome; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function baixarTudo(n) {
+  let all = [], de = 0;
+  for (;;) {
+    const { data, error } = await sb.from(n).select('*').order('created_at').order('id').range(de, de + 999);
+    if (error) return null;
+    all = all.concat(data); if (data.length < 1000) return all; de += 1000;
+  }
+}
+async function lerTudo() {
+  const t = {};
+  for (const n of ['categorias', 'contas', 'cartoes', 'lancamentos']) { t[n] = await baixarTudo(n); if (!t[n]) { toast('Não foi possível ler os dados. Verifique a conexão.'); return null; } }
+  return t;
+}
+async function exportarJson() {
+  const t = await lerTudo(); if (!t) return;
+  baixar('financeiro-backup-' + hoje() + '.json', JSON.stringify({ versao: 1, em: new Date().toISOString(), ...t }), 'application/json');
+  localStorage.setItem('cf_ult_backup', hoje()); infoBackup(); toast('Backup baixado.');
+}
+async function restaurarJson(file) {
+  let d; try { d = JSON.parse(await file.text()); } catch { return toast('Arquivo inválido.'); }
+  if (!Array.isArray(d.lancamentos)) return toast('Este arquivo não parece ser um backup do app.');
+  if (!confirm('Restaurar ' + d.lancamentos.length + ' lançamentos? Itens com o mesmo código são atualizados e nada é apagado.')) return;
+  for (const n of ['categorias', 'contas', 'cartoes', 'lancamentos']) {
+    const rows = (d[n] || []).map(({ user_id, ...r }) => r);
+    for (let i = 0; i < rows.length; i += 200) {
+      const { error } = await sb.from(n).upsert(rows.slice(i, i + 200));
+      if (error) return toast('Falha ao restaurar ' + n + ': ' + error.message);
+    }
+  }
+  await loadCats(false); await loadContas(); await loadCartoes(); await loadLans(); toast('Backup restaurado.');
+}
+async function exportarCsv() {
+  const t = await lerTudo(); if (!t) return;
+  const nm = (arr, id) => arr.find(x => x.id === id)?.nome || '';
+  const esc = s => { s = String(s ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const linhas = [['data', 'tipo', 'categoria', 'descricao', 'valor', 'situacao', 'conta', 'cartao', 'parcela']];
+  for (const l of t.lancamentos.sort((a, b) => a.data.localeCompare(b.data)))
+    linhas.push([l.data, l.tipo, nm(t.categorias, l.categoria_id), l.descricao, (l.valor_centavos / 100).toFixed(2).replace('.', ','), l.status, nm(t.contas, l.conta_id), nm(t.cartoes, l.cartao_id || l.fatura_de), l.parcela_total ? l.parcela_n + '/' + l.parcela_total : '']);
+  baixar('lancamentos-' + hoje() + '.csv', '\ufeff' + linhas.map(r => r.map(esc).join(';')).join('\r\n'), 'text/csv');
+}
+function csvLinhas(t) {
+  t = t.replace(/^\ufeff/, ''); const sep = t.split(/\r?\n/)[0].includes(';') ? ';' : ',';
+  return t.split(/\r?\n/).filter(x => x.trim()).map(l => { const o = []; let c = '', q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === sep && !q) { o.push(c); c = ''; } else c += ch; } o.push(c); return o.map(s => s.trim()); });
+}
+async function importarCsv(file) {
+  const L = csvLinhas(await file.text()); if (L.length && /^tipo$/i.test(L[0][0])) L.shift();
+  const rows = [], ign = [];
+  L.forEach((c, i) => {
+    const t = /^s/i.test(c[0]) ? 'saida' : /^e/i.test(c[0]) ? 'entrada' : null;
+    let d = c[1] || ''; const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (m) d = m[3] + '-' + m[2] + '-' + m[1];
+    const v = parseValor(c[4] || '');
+    if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(d) || !v) return ign.push(i + 1);
+    const cat = cats.find(x => x.tipo === t && x.nome.toLowerCase() === (c[2] || '').toLowerCase());
+    rows.push({ id: crypto.randomUUID(), tipo: t, data: d, valor_centavos: v, categoria_id: cat?.id || null, descricao: c[3] || null, status: /^(pend|a pagar|a receber)/i.test(c[5] || '') ? 'pendente' : 'pago' });
+  });
+  if (!rows.length) return toast('Nenhuma linha válida. Use o modelo de CSV.');
+  if (!confirm('Importar ' + rows.length + ' lançamentos' + (ign.length ? ' (' + ign.length + ' linhas ignoradas: ' + ign.slice(0, 8).join(', ') + ')' : '') + '?')) return;
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await sb.from('lancamentos').insert(rows.slice(i, i + 200));
+    if (error) return toast('Falha ao importar: ' + error.message);
+  }
+  await loadLans(); toast(rows.length + ' lançamentos importados.');
+}
+function infoBackup() {
+  const u = localStorage.getItem('cf_ult_backup');
+  $('#bkinfo').textContent = u ? 'Último backup neste aparelho: ' + u.split('-').reverse().join('/') + '.' : 'Nenhum backup feito neste aparelho ainda.';
+}
+function lembrarBackup() {
+  const u = localStorage.getItem('cf_ult_backup');
+  if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
 // ---- painéis ----
 let aba = 'm';
 const rotMes = m => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -562,7 +653,7 @@ function tempoReal() {
 async function entrar(user) {
   uid = user.id;
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadLans(); gerarFixos(); tempoReal();
+  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -583,6 +674,14 @@ $('#ant').onclick = () => { mes = addMes(mes, -1); render(); };
 $('#prox').onclick = () => { mes = addMes(mes, 1); render(); };
 $('#bcontas').onclick = () => { editarConta(null); listarContas(); $('#dc').showModal(); };
 $('#cfechar').onclick = () => $('#dc').close();
+$('#bbk').onclick = () => { infoBackup(); $('#dbk').showModal(); };
+$('#bkfechar').onclick = () => $('#dbk').close();
+$('#bexp').onclick = exportarJson;
+$('#bcsv').onclick = exportarCsv;
+$('#bmod').onclick = () => baixar('modelo-importacao.csv', '\ufefftipo;data;categoria;descricao;valor;situacao\r\nsaida;15/11/2026;Mercado;Compras do mês;350,00;pago\r\nentrada;05/11/2026;Trabalho fixo;Salário;4500,00;pendente', 'text/csv');
+$('#bres').onclick = () => { $('#arq').dataset.modo = 'json'; $('#arq').click(); };
+$('#bimp').onclick = () => { $('#arq').dataset.modo = 'csv'; $('#arq').click(); };
+$('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.dataset.modo; e.target.value = ''; if (f) await (m === 'json' ? restaurarJson(f) : importarCsv(f)); };
 $('#bpain').onclick = () => { painel(); $('#dpn').showModal(); };
 $('#pfechar').onclick = () => $('#dpn').close();
 $('#pant').onclick = () => mudarPeriodo(-1);
