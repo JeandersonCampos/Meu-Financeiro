@@ -59,7 +59,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 5)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 6)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -83,7 +83,8 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <button class="link" id="bcontas">Contas e saldos</button>
+  <div style="display:flex;justify-content:center;gap:20px"><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button></div>
+  <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
   <button class="sair" id="sair">Sair da conta</button>
 </main>
@@ -97,8 +98,9 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     </div>
     <label for="valor" id="lv">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
     <label for="data">Data</label><input id="data" type="date" required>
-    <label for="st">Situação</label><select id="st"></select>
-    <label for="cn">Conta</label><select id="cn"></select>
+    <div id="pcbox"><label for="pc">Pagar com</label><select id="pc"></select></div>
+    <label for="st" id="lst">Situação</label><select id="st"></select>
+    <label for="cn" id="lcn">Conta</label><select id="cn"></select>
     <label for="cat">Categoria</label><select id="cat"></select>
     <label for="desc">Descrição</label><input id="desc" maxlength="120">
     <small id="ginfo" style="display:block;margin-top:12px;color:var(--mut)"></small>
@@ -118,6 +120,17 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <label for="cnome">Nome da conta</label><input id="cnome" maxlength="40" required>
     <label for="csal">Saldo inicial (R$)</label><input id="csal" inputmode="decimal" placeholder="0,00">
     <div class="acts"><button type="button" id="cfechar">Fechar</button><button type="button" class="del" id="cexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
+  </form>
+</dialog>
+<dialog id="dk">
+  <form id="fk">
+    <h2>Cartões de crédito</h2>
+    <div id="lk"></div>
+    <label for="knome">Nome do cartão</label><input id="knome" maxlength="40" required>
+    <label for="kfech">Dia de fechamento</label><input id="kfech" type="number" min="1" max="31" required>
+    <label for="kven">Dia de vencimento</label><input id="kven" type="number" min="1" max="31" required>
+    <label for="kconta">Conta que paga a fatura</label><select id="kconta"></select>
+    <div class="acts"><button type="button" id="kfechar">Fechar</button><button type="button" class="del" id="kexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
   </form>
 </dialog>
 <div id="toast" role="status"></div>
@@ -155,7 +168,7 @@ const pad = n => String(n).padStart(2, '0');
 const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
 const addMes = (m, n) => { const [y, k] = m.split('-').map(Number); const d = new Date(y, k - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
 
-let uid, cats = [], contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
+let uid, cats = [], cartoes = [], kedit = null, contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
 
 const key = k => 'cf_' + uid + '_' + k;
 const lerLS = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
@@ -185,6 +198,12 @@ async function loadContas() {
   contas = data; localStorage.setItem(key('contas'), JSON.stringify(data));
 }
 
+async function loadCartoes() {
+  const { data, error } = await sb.from('cartoes').select('*').order('nome');
+  if (error) { cartoes = lerLS(key('cartoes'), []); if (/relation|cartoes/.test(error.message)) erro('rode o arquivo migracao-etapa4.sql no SQL Editor do Supabase.'); return; }
+  cartoes = data; localStorage.setItem(key('cartoes'), JSON.stringify(data));
+}
+
 async function loadLans() {
   let all = [], de = 0, falhou = false;
   for (;;) {
@@ -195,6 +214,7 @@ async function loadLans() {
   }
   if (falhou) lans = lerLS(key('all'), []); else { lans = all; localStorage.setItem(key('all'), JSON.stringify(all)); }
   render();
+  if (!falhou) sincronizarFaturas();
 }
 
 async function flush() {
@@ -207,10 +227,10 @@ async function flush() {
 const todas = () => { const ids = new Set(pend().map(p => p.id)); return [...pend().map(p => ({ ...p, _p: 1 })), ...lans.filter(l => !ids.has(l.id))]; };
 
 function render() {
-  const T = todas(), ini = mes + '-01';
+  const TA = todas(), T = TA.filter(l => !l.cartao_id), ini = mes + '-01';
   const base = contas.reduce((s, c) => s + c.saldo_inicial_centavos, 0);
   const ant = base + val(T, l => l.status === 'pago' && l.data < ini);
-  const M = T.filter(l => l.data.startsWith(mes)).sort((a, b) => b.data.localeCompare(a.data));
+  const M = T.filter(l => l.data.startsWith(mes)), ML = TA.filter(l => l.data.startsWith(mes)).sort((a, b) => b.data.localeCompare(a.data));
   const e = soma(M, l => l.tipo === 'entrada'), s = soma(M, l => l.tipo === 'saida');
   const ar = soma(M, l => l.tipo === 'entrada' && l.status !== 'pago'), ap = soma(M, l => l.tipo === 'saida' && l.status !== 'pago');
   const real = ant + val(M, l => l.status === 'pago'), prev = real + ar - ap;
@@ -219,24 +239,28 @@ function render() {
   const set = (id, v) => $(id).textContent = fmt(v);
   set('#tin', e); set('#tout', s); set('#arec', ar); set('#apag', ap); set('#sini', ant); set('#sres', e - s); set('#real', real); set('#res', prev);
   $('#res').className = 'big num ' + (prev < 0 ? 'out' : '');
+  const fv = soma(M, l => l.fatura_de), pc = e ? Math.round(fv / e * 100) : null, fl = $('#fatl');
+  fl.hidden = !fv;
+  if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? '' : ' (' + pc + '% das entradas) · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
   const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
   const box = $('#lista'); box.textContent = '';
-  if (!M.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
-  for (const l of M) {
+  if (!ML.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
+  for (const l of ML) {
     const pg = l.status === 'pago', ent = l.tipo === 'entrada';
     const r = document.createElement('div'); r.className = 'row' + (pg ? '' : ' pend');
     const c = document.createElement('button'); c.className = 'chk'; c.setAttribute('aria-pressed', pg);
     c.setAttribute('aria-label', pg ? 'Marcar como pendente' : (ent ? 'Marcar como recebido' : 'Marcar como pago'));
     c.innerHTML = '<i>' + (pg ? '✓' : '') + '</i>'; c.onclick = () => mudarStatus(l);
+    if (l.cartao_id) { c.disabled = true; c.removeAttribute('aria-pressed'); c.setAttribute('aria-label', 'Compra no cartão'); c.innerHTML = '<i style="border:0">💳</i>'; }
     const m = document.createElement('button'); m.className = 'main';
     const t = document.createElement('div'); t.className = 't';
     const b1 = document.createElement('b'); b1.textContent = (l.descricao || nome(l.categoria_id)) + (l.parcela_total ? ' (' + l.parcela_n + '/' + l.parcela_total + ')' : '');
     const sp = document.createElement('span');
-    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
+    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.cartao_id ? ' · ' + (cartoes.find(k => k.id === l.cartao_id)?.nome || 'cartão') : '') + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
     t.append(b1, sp);
     const v = document.createElement('div'); v.className = 'num ' + (ent ? 'in' : 'out');
     v.textContent = (ent ? '+ ' : '− ') + fmt(l.valor_centavos);
-    m.append(t, v); m.onclick = () => abrir(l); r.append(c, m); box.append(r);
+    m.append(t, v); m.onclick = () => l.fatura_de ? toast('Fatura calculada pelas compras do cartão. Marque como paga na bolinha.') : abrir(l); r.append(c, m); box.append(r);
   }
 }
 
@@ -259,7 +283,11 @@ function setTipo(t) {
   const st = $('#st'), sv = st.value || 'pago'; st.textContent = '';
   for (const [v, n] of [['pago', t === 'entrada' ? 'Recebido' : 'Pago'], ['pendente', t === 'entrada' ? 'A receber' : 'A pagar']]) { const o = document.createElement('option'); o.value = v; o.textContent = n; st.append(o); }
   st.value = sv;
+  $('#pcbox').hidden = !cartoes.length || t === 'entrada';
+  if (t === 'entrada') $('#pc').value = '';
+  pcmudou();
 }
+function pcmudou() { const k = !!$('#pc').value; $('#st').hidden = $('#lst').hidden = $('#cn').hidden = $('#lcn').hidden = k; }
 
 function abrir(l) {
   editing = l || null;
@@ -270,6 +298,9 @@ function abrir(l) {
   const cn = $('#cn'); cn.textContent = '';
   for (const [v, n] of [['', 'Sem conta'], ...contas.map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; cn.append(o); }
   cn.value = l?.conta_id || '';
+  const pc = $('#pc'); pc.textContent = '';
+  for (const [v, n] of [['', 'Conta ou dinheiro'], ...cartoes.map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; pc.append(o); }
+  pc.value = l?.cartao_id || '';
   setTipo(l ? l.tipo : 'saida');
   if (l?.categoria_id) $('#cat').value = l.categoria_id;
   $('#exc').hidden = !l;
@@ -282,8 +313,8 @@ async function salvar(ev) {
   ev.preventDefault();
   const v = parseValor($('#valor').value);
   if (!v) return toast('Informe um valor maior que zero.');
-  const row = { id: editing?.id || crypto.randomUUID(), tipo, data: $('#data').value, valor_centavos: v, status: $('#st').value,
-    conta_id: $('#cn').value || null, categoria_id: $('#cat').value || null, descricao: $('#desc').value.trim() || null };
+  const row = { id: editing?.id || crypto.randomUUID(), tipo, data: $('#data').value, valor_centavos: v, status: $('#pc').value ? 'pago' : $('#st').value,
+    conta_id: $('#pc').value ? null : ($('#cn').value || null), cartao_id: $('#pc').value || null, categoria_id: $('#cat').value || null, descricao: $('#desc').value.trim() || null };
   if (editing) {
     Object.assign(row, { grupo_id: editing.grupo_id ?? null, parcela_n: editing.parcela_n ?? null, parcela_total: editing.parcela_total ?? null, recorrente: !!editing.recorrente });
     if (editing._p) queue(row);
@@ -343,9 +374,75 @@ async function gerarFixos() {
   if (novos.length) { await sb.from('lancamentos').upsert(novos, { onConflict: 'grupo_id,data', ignoreDuplicates: true }); await loadLans(); }
 }
 
+// ---- cartões e faturas ----
+// compra até o dia do fechamento entra na fatura do mês; depois, na seguinte
+function cicloFatura(c, data) {
+  const m = data.slice(0, 7), ref = +data.slice(8, 10) <= c.dia_fechamento ? m : addMes(m, 1);
+  return { ref, venc: dataMais(ref + '-' + pad(c.dia_vencimento), c.dia_vencimento > c.dia_fechamento ? 0 : 1) };
+}
+
+let sincAtivo = false;
+async function sincronizarFaturas() {
+  if (sincAtivo || !navigator.onLine) return;
+  sincAtivo = true;
+  try {
+    const alvo = {}, exist = {}, catF = cats.find(c => c.nome === 'Faturas' && c.tipo === 'saida')?.id ?? null;
+    for (const l of lans) {
+      const c = l.cartao_id && cartoes.find(k => k.id === l.cartao_id); if (!c) continue;
+      const { ref, venc } = cicloFatura(c, l.data);
+      (alvo[c.id + '|' + ref] ??= { c, ref, venc, total: 0 }).total += l.valor_centavos;
+    }
+    for (const l of lans) if (l.fatura_de) exist[l.fatura_de + '|' + l.fatura_ref] = l;
+    const up = [], del = [];
+    for (const [k, a] of Object.entries(alvo)) {
+      const f = exist[k];
+      if (!f) up.push({ id: crypto.randomUUID(), tipo: 'saida', status: 'pendente', descricao: 'Fatura ' + a.c.nome, valor_centavos: a.total, data: a.venc, categoria_id: catF, conta_id: a.c.conta_id, fatura_de: a.c.id, fatura_ref: a.ref });
+      else if (f.valor_centavos !== a.total || f.data !== a.venc) up.push({ ...f, valor_centavos: a.total, data: a.venc });
+    }
+    for (const [k, f] of Object.entries(exist)) if (!alvo[k] && f.status !== 'pago') del.push(f.id);
+    let ok = true;
+    if (up.length) ok = !(await sb.from('lancamentos').upsert(up)).error;
+    if (del.length) ok = !(await sb.from('lancamentos').delete().in('id', del)).error && ok;
+    sincAtivo = false;
+    if (ok && (up.length || del.length)) await loadLans();
+  } finally { sincAtivo = false; }
+}
+
+function listarCartoes() {
+  const box = $('#lk'); box.textContent = '';
+  for (const c of cartoes) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
+    const a = document.createElement('span'); a.textContent = c.nome + ' · fecha dia ' + c.dia_fechamento + ' · vence dia ' + c.dia_vencimento;
+    const v = document.createElement('b'); v.className = 'num';
+    v.textContent = fmt(soma(lans, l => l.fatura_de === c.id && l.data.startsWith(mes)));
+    b.append(a, v); b.onclick = () => editarCartao(c); box.append(b);
+  }
+  if (cartoes.length) { const s = document.createElement('small'); s.style.color = 'var(--mut)'; s.textContent = 'Valores: fatura que vence em ' + $('#mesn').textContent + '.'; box.append(s); }
+}
+function editarCartao(c) {
+  kedit = c || null;
+  $('#knome').value = c?.nome || ''; $('#kfech').value = c?.dia_fechamento || ''; $('#kven').value = c?.dia_vencimento || '';
+  const s = $('#kconta'); s.textContent = '';
+  for (const [v, n] of [['', 'Sem conta definida'], ...contas.map(x => [x.id, x.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; s.append(o); }
+  s.value = c?.conta_id || ''; $('#kexc').hidden = !c;
+}
+async function salvarCartao(ev) {
+  ev.preventDefault();
+  const row = { id: kedit?.id || crypto.randomUUID(), nome: $('#knome').value.trim(), dia_fechamento: +$('#kfech').value, dia_vencimento: +$('#kven').value, conta_id: $('#kconta').value || null };
+  const { error } = await sb.from('cartoes').upsert(row);
+  if (error) return toast('Não foi possível salvar o cartão agora. Verifique a conexão.');
+  await loadCartoes(); editarCartao(null); listarCartoes(); loadLans();
+}
+async function excluirCartao() {
+  if (!kedit || !confirm('Excluir o cartão "' + kedit.nome + '"? Isso apaga também as compras e as faturas dele.')) return;
+  const { error } = await sb.from('cartoes').delete().eq('id', kedit.id);
+  if (error) return toast('Não foi possível excluir agora.');
+  await loadCartoes(); await loadLans(); editarCartao(null); listarCartoes();
+}
+
 // ---- contas ----
 function listarContas() {
-  const T = todas(), box = $('#lc'); box.textContent = '';
+  const T = todas().filter(l => !l.cartao_id), box = $('#lc'); box.textContent = '';
   const linha = (n, v, fn) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
     const a = document.createElement('span'); a.textContent = n;
@@ -383,13 +480,14 @@ function tempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => loadLans())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'contas' }, async () => { await loadContas(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cartoes' }, async () => { await loadCartoes(); render(); })
     .subscribe();
 }
 
 async function entrar(user) {
   uid = user.id;
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadLans(); gerarFixos(); tempoReal();
+  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadLans(); gerarFixos(); tempoReal();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -410,6 +508,11 @@ $('#ant').onclick = () => { mes = addMes(mes, -1); render(); };
 $('#prox').onclick = () => { mes = addMes(mes, 1); render(); };
 $('#bcontas').onclick = () => { editarConta(null); listarContas(); $('#dc').showModal(); };
 $('#cfechar').onclick = () => $('#dc').close();
+$('#bcart').onclick = () => { editarCartao(null); listarCartoes(); $('#dk').showModal(); };
+$('#kfechar').onclick = () => $('#dk').close();
+$('#kexc').onclick = excluirCartao;
+$('#fk').onsubmit = salvarCartao;
+$('#pc').onchange = pcmudou;
 $('#cexc').onclick = excluirConta;
 $('#fc').onsubmit = salvarConta;
 $('#novo').onclick = () => abrir(null);
