@@ -59,7 +59,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 4)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 5)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -95,12 +95,15 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
       <button type="button" data-t="saida">Saída</button>
       <button type="button" data-t="entrada">Entrada</button>
     </div>
-    <label for="valor">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
+    <label for="valor" id="lv">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
     <label for="data">Data</label><input id="data" type="date" required>
     <label for="st">Situação</label><select id="st"></select>
     <label for="cn">Conta</label><select id="cn"></select>
     <label for="cat">Categoria</label><select id="cat"></select>
     <label for="desc">Descrição</label><input id="desc" maxlength="120">
+    <small id="ginfo" style="display:block;margin-top:12px;color:var(--mut)"></small>
+    <div id="repbox"><label for="rep">Repetição</label><select id="rep"><option value="1">Só uma vez</option><option value="p">Parcelado</option><option value="m">Todo mês (fixo)</option></select>
+      <div id="np" hidden><label for="npar">Número de parcelas</label><input id="npar" type="number" min="2" max="60" value="2"></div></div>
     <div class="acts">
       <button type="button" id="canc">Cancelar</button>
       <button type="button" class="del" id="exc">Excluir</button>
@@ -227,9 +230,9 @@ function render() {
     c.innerHTML = '<i>' + (pg ? '✓' : '') + '</i>'; c.onclick = () => mudarStatus(l);
     const m = document.createElement('button'); m.className = 'main';
     const t = document.createElement('div'); t.className = 't';
-    const b1 = document.createElement('b'); b1.textContent = l.descricao || nome(l.categoria_id);
+    const b1 = document.createElement('b'); b1.textContent = (l.descricao || nome(l.categoria_id)) + (l.parcela_total ? ' (' + l.parcela_n + '/' + l.parcela_total + ')' : '');
     const sp = document.createElement('span');
-    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l._p ? ' · aguardando envio' : '');
+    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
     t.append(b1, sp);
     const v = document.createElement('div'); v.className = 'num ' + (ent ? 'in' : 'out');
     v.textContent = (ent ? '+ ' : '− ') + fmt(l.valor_centavos);
@@ -270,6 +273,8 @@ function abrir(l) {
   setTipo(l ? l.tipo : 'saida');
   if (l?.categoria_id) $('#cat').value = l.categoria_id;
   $('#exc').hidden = !l;
+  $('#repbox').hidden = !!l; $('#rep').value = '1'; $('#rep').onchange();
+  $('#ginfo').textContent = l?.parcela_total ? 'Parcela ' + l.parcela_n + ' de ' + l.parcela_total : l?.recorrente ? 'Lançamento fixo mensal' : '';
   $('#dlg').showModal();
 }
 
@@ -279,12 +284,25 @@ async function salvar(ev) {
   if (!v) return toast('Informe um valor maior que zero.');
   const row = { id: editing?.id || crypto.randomUUID(), tipo, data: $('#data').value, valor_centavos: v, status: $('#st').value,
     conta_id: $('#cn').value || null, categoria_id: $('#cat').value || null, descricao: $('#desc').value.trim() || null };
-  if (editing && !editing._p) {
-    const { error } = await sb.from('lancamentos').update(row).eq('id', row.id);
-    if (error) return toast('Não foi possível salvar agora. Verifique a conexão e tente de novo.');
+  if (editing) {
+    Object.assign(row, { grupo_id: editing.grupo_id ?? null, parcela_n: editing.parcela_n ?? null, parcela_total: editing.parcela_total ?? null, recorrente: !!editing.recorrente });
+    if (editing._p) queue(row);
+    else {
+      const { error } = await sb.from('lancamentos').update(row).eq('id', row.id);
+      if (error) return toast('Não foi possível salvar agora. Verifique a conexão e tente de novo.');
+      const mudou = ['valor_centavos', 'categoria_id', 'conta_id', 'descricao'].some(c => (editing[c] ?? null) !== row[c]);
+      if (row.grupo_id && mudou && confirm('Aplicar valor, categoria, conta e descrição também às próximas?\nOK = esta e as próximas. Cancelar = só esta.')) {
+        const { error: e2 } = await sb.from('lancamentos').update({ valor_centavos: v, categoria_id: row.categoria_id, conta_id: row.conta_id, descricao: row.descricao })
+          .eq('grupo_id', row.grupo_id).gt('data', row.data);
+        if (e2) toast('Esta foi salva, mas não deu para atualizar as próximas.');
+      }
+    }
   } else {
-    const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(row) : { error: 1 };
-    if (error) { queue(row); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
+    const r = $('#rep').value, n = r === 'p' ? Math.max(2, Math.min(60, parseInt($('#npar').value) || 2)) : r === 'm' ? 12 : 1, g = n > 1 ? crypto.randomUUID() : null;
+    const rows = Array.from({ length: n }, (_, i) => ({ ...row, id: i ? crypto.randomUUID() : row.id, data: dataMais(row.data, i), status: i ? 'pendente' : row.status,
+      grupo_id: g, parcela_n: r === 'p' ? i + 1 : null, parcela_total: r === 'p' ? n : null, recorrente: r === 'm' }));
+    const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(rows) : { error: 1 };
+    if (error) { rows.forEach(x => queue(x)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
   }
   $('#dlg').close(); loadLans();
 }
@@ -293,10 +311,36 @@ async function excluir() {
   if (!editing || !confirm('Excluir este lançamento?')) return;
   if (editing._p) setPend(pend().filter(p => p.id !== editing.id));
   else {
-    const { error } = await sb.from('lancamentos').delete().eq('id', editing.id);
+    const g = editing.grupo_id, tudo = g && confirm('Excluir também as próximas parcelas ou ocorrências?\nOK = esta e as próximas. Cancelar = só esta.');
+    const { error } = await (tudo ? sb.from('lancamentos').delete().eq('grupo_id', g).gte('data', editing.data) : sb.from('lancamentos').delete().eq('id', editing.id));
     if (error) return toast('Não foi possível excluir agora. Verifique a conexão.');
+    if (tudo && editing.recorrente) await sb.from('lancamentos').update({ recorrente: false }).eq('grupo_id', g);
   }
   $('#dlg').close(); loadLans();
+}
+
+// mesma data k meses depois (dia 31 vira o último dia do mês quando preciso)
+function dataMais(d, k) {
+  const [y, m, dd] = d.split('-').map(Number), t = new Date(y, m - 1 + k, 1);
+  const max = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(Math.min(dd, max));
+}
+const mesesEntre = (a, b) => (+b.slice(0, 4) - +a.slice(0, 4)) * 12 + (+b.slice(5, 7) - +a.slice(5, 7));
+
+// mantém os lançamentos fixos criados até 12 meses à frente
+async function gerarFixos() {
+  if (!navigator.onLine) return;
+  const grupos = {}, mesAtual = hoje().slice(0, 7), alvo = addMes(mesAtual, 12), novos = [];
+  for (const l of lans) if (l.recorrente && l.grupo_id) (grupos[l.grupo_id] ??= []).push(l);
+  for (const rows of Object.values(grupos)) {
+    rows.sort((a, b) => a.data.localeCompare(b.data));
+    const prim = rows[0], ult = rows[rows.length - 1];
+    if (ult.data.slice(0, 7) >= addMes(mesAtual, 6)) continue;
+    for (let k = mesesEntre(prim.data, ult.data) + 1; dataMais(prim.data, k).slice(0, 7) <= alvo; k++)
+      novos.push({ id: crypto.randomUUID(), tipo: ult.tipo, valor_centavos: ult.valor_centavos, categoria_id: ult.categoria_id, conta_id: ult.conta_id,
+        descricao: ult.descricao, grupo_id: ult.grupo_id, recorrente: true, status: 'pendente', data: dataMais(prim.data, k) });
+  }
+  if (novos.length) { await sb.from('lancamentos').upsert(novos, { onConflict: 'grupo_id,data', ignoreDuplicates: true }); await loadLans(); }
 }
 
 // ---- contas ----
@@ -345,7 +389,7 @@ function tempoReal() {
 async function entrar(user) {
   uid = user.id;
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadLans(); tempoReal();
+  await flush(); await loadCats(); await loadContas(); await loadLans(); gerarFixos(); tempoReal();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -373,6 +417,7 @@ $('#canc').onclick = () => $('#dlg').close();
 $('#exc').onclick = excluir;
 $('#fd').onsubmit = salvar;
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTipo(b.dataset.t));
+$('#rep').onchange = () => { const p = $('#rep').value === 'p'; $('#np').hidden = !p; $('#lv').textContent = p ? 'Valor de cada parcela (R$)' : 'Valor (R$)'; };
 window.addEventListener('online', async () => { await flush(); loadLans(); });
 
 (async () => {
