@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 10)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 11)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -85,7 +85,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
+  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bmeta">Metas</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
   <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
@@ -137,6 +137,22 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <button type="button" id="bkfechar">Fechar</button>
   </div>
   <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
+</dialog>
+<dialog id="dmt" style="max-height:92vh;overflow:auto">
+  <form id="fm">
+    <h2>Metas e reserva</h2>
+    <div id="lm"></div>
+    <label for="mnome">Nome da meta</label><input id="mnome" maxlength="40" placeholder="Reserva de emergência" required>
+    <label for="malvo">Valor da meta (R$)</label><input id="malvo" inputmode="decimal" placeholder="0,00" required>
+    <label for="mprazo">Prazo (opcional)</label><input id="mprazo" type="month">
+    <div class="acts"><button type="button" id="mfechar">Fechar</button><button type="button" class="del" id="mexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
+    <div id="mov" hidden>
+      <h3>Guardar ou retirar</h3>
+      <label for="mval">Valor (R$)</label><input id="mval" inputmode="decimal" placeholder="0,00">
+      <label for="mcn">Conta</label><select id="mcn"></select>
+      <div class="acts"><button type="button" id="mret">Retirar</button><button type="button" class="ok" id="mguar">Guardar</button></div>
+    </div>
+  </form>
 </dialog>
 <dialog id="dor">
   <form id="fo">
@@ -199,7 +215,7 @@ const pad = n => String(n).padStart(2, '0');
 const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
 const addMes = (m, n) => { const [y, k] = m.split('-').map(Number); const d = new Date(y, k - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
 
-let uid, cats = [], orcs = [], oedit = null, cartoes = [], kedit = null, contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
+let uid, cats = [], metas = [], medit = null, orcs = [], oedit = null, cartoes = [], kedit = null, contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
 
 const key = k => 'cf_' + uid + '_' + k;
 const lerLS = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
@@ -230,6 +246,12 @@ async function loadContas() {
   contas = data; localStorage.setItem(key('contas'), JSON.stringify(data));
 }
 
+async function loadMetas() {
+  const { data, error } = await sb.from('metas').select('*').order('created_at');
+  if (error) { metas = lerLS(key('metas'), []); if (/relation|metas/.test(error.message)) erro('rode o arquivo migracao-etapa7b.sql no SQL Editor do Supabase.'); return; }
+  metas = data; localStorage.setItem(key('metas'), JSON.stringify(data));
+}
+
 async function loadOrcs() {
   const { data, error } = await sb.from('orcamentos').select('*');
   if (error) { orcs = lerLS(key('orcs'), []); if (/relation|orcamentos/.test(error.message)) erro('rode o arquivo migracao-etapa7a.sql no SQL Editor do Supabase.'); return; }
@@ -251,7 +273,7 @@ async function loadLans() {
     all = all.concat(data); if (data.length < 1000) break; de += 1000;
   }
   if (falhou) lans = lerLS(key('all'), []); else { lans = all; localStorage.setItem(key('all'), JSON.stringify(all)); }
-  render(); if ($('#dpn').open) painel();
+  render(); if ($('#dpn').open) painel(); if ($('#dmt').open) listarMetas();
   if (!falhou) sincronizarFaturas();
 }
 
@@ -434,7 +456,7 @@ async function baixarTudo(n) {
 }
 async function lerTudo() {
   const t = {};
-  for (const n of ['categorias', 'contas', 'cartoes', 'lancamentos']) { t[n] = await baixarTudo(n); if (!t[n]) { toast('Não foi possível ler os dados. Verifique a conexão.'); return null; } }
+  for (const n of ['categorias', 'contas', 'cartoes', 'metas', 'orcamentos', 'lancamentos']) { t[n] = await baixarTudo(n); if (!t[n]) { toast('Não foi possível ler os dados. Verifique a conexão.'); return null; } }
   return t;
 }
 async function exportarJson() {
@@ -446,7 +468,7 @@ async function restaurarJson(file) {
   let d; try { d = JSON.parse(await file.text()); } catch { return toast('Arquivo inválido.'); }
   if (!Array.isArray(d.lancamentos)) return toast('Este arquivo não parece ser um backup do app.');
   if (!confirm('Restaurar ' + d.lancamentos.length + ' lançamentos? Itens com o mesmo código são atualizados e nada é apagado.')) return;
-  for (const n of ['categorias', 'contas', 'cartoes', 'lancamentos']) {
+  for (const n of ['categorias', 'contas', 'cartoes', 'metas', 'orcamentos', 'lancamentos']) {
     const rows = (d[n] || []).map(({ user_id, ...r }) => r);
     for (let i = 0; i < rows.length; i += 200) {
       const { error } = await sb.from(n).upsert(rows.slice(i, i + 200));
@@ -494,6 +516,58 @@ function infoBackup() {
 function lembrarBackup() {
   const u = localStorage.getItem('cf_ult_backup');
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
+// ---- metas e reserva ----
+const guardado = id => todas().filter(l => l.meta_id === id && l.status === 'pago').reduce((s, l) => s + (l.tipo === 'saida' ? 1 : -1) * l.valor_centavos, 0);
+function listarMetas() {
+  const box = $('#lm'); box.textContent = '';
+  if (!metas.length) { const p = document.createElement('p'); p.className = 'empty'; p.style.padding = '8px 0'; p.textContent = 'Nenhuma meta ainda. Crie a primeira abaixo, por exemplo "Reserva de emergência".'; box.append(p); }
+  for (const m of metas) {
+    const g = guardado(m.id), pct = Math.round(g / m.alvo_centavos * 100), w = document.createElement('div'); w.className = 'br';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
+    const a = document.createElement('span'); a.textContent = m.nome;
+    const v = document.createElement('b'); v.className = 'num'; v.textContent = fmt(g) + ' de ' + fmt(m.alvo_centavos) + ' · ' + pct + '%'; b.append(a, v); b.onclick = () => editarMeta(m);
+    const tr = document.createElement('div'); tr.className = 'tr'; const f = document.createElement('div'); f.className = pct >= 100 ? 'i' : 'c'; f.style.width = Math.max(0, Math.min(100, pct)) + '%'; tr.append(f);
+    const s = document.createElement('small'); s.style.color = 'var(--mut)';
+    if (g >= m.alvo_centavos) s.textContent = 'Meta atingida!';
+    else {
+      s.textContent = 'Faltam ' + fmt(m.alvo_centavos - g);
+      if (m.prazo) { const meses = Math.max(1, mesesEntre(hoje().slice(0, 7), m.prazo.slice(0, 7)) + 1); s.textContent += ' · sugestão: ' + fmt(Math.ceil((m.alvo_centavos - g) / meses)) + ' por mês até ' + m.prazo.slice(5, 7) + '/' + m.prazo.slice(0, 4); }
+    }
+    w.append(b, tr, s); box.append(w);
+  }
+}
+function editarMeta(m) {
+  medit = m || null;
+  $('#mnome').value = m?.nome || ''; $('#malvo').value = m ? (m.alvo_centavos / 100).toFixed(2).replace('.', ',') : ''; $('#mprazo').value = m?.prazo ? m.prazo.slice(0, 7) : '';
+  $('#mexc').hidden = !m; $('#mov').hidden = !m; $('#mval').value = '';
+  const s = $('#mcn'); s.textContent = '';
+  for (const [v, n] of [['', 'Sem conta'], ...contas.map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; s.append(o); }
+}
+async function salvarMeta(ev) {
+  ev.preventDefault();
+  const v = parseValor($('#malvo').value); if (!v) return toast('Informe um valor de meta maior que zero.');
+  const row = { id: medit?.id || crypto.randomUUID(), nome: $('#mnome').value.trim(), alvo_centavos: v, prazo: $('#mprazo').value ? $('#mprazo').value + '-01' : null };
+  const { error } = await sb.from('metas').upsert(row);
+  if (error) return toast('Não foi possível salvar a meta agora. Verifique a conexão.');
+  await loadMetas(); editarMeta(null); listarMetas();
+}
+async function excluirMeta() {
+  if (!medit || !confirm('Excluir a meta "' + medit.nome + '"? Os valores já guardados continuam como lançamentos.')) return;
+  const { error } = await sb.from('metas').delete().eq('id', medit.id);
+  if (error) return toast('Não foi possível excluir agora.');
+  await loadMetas(); await loadLans(); editarMeta(null); listarMetas();
+}
+async function moverMeta(guardar) {
+  const v = parseValor($('#mval').value); if (!v || !medit) return toast('Informe um valor maior que zero.');
+  if (!guardar && v > guardado(medit.id)) return toast('Você só tem ' + fmt(guardado(medit.id)) + ' guardado nesta meta.');
+  const row = { id: crypto.randomUUID(), tipo: guardar ? 'saida' : 'entrada', data: hoje(), valor_centavos: v, status: 'pago', conta_id: $('#mcn').value || null, meta_id: medit.id,
+    categoria_id: cats.find(c => c.tipo === (guardar ? 'saida' : 'entrada') && c.nome === (guardar ? 'Investimentos e reserva' : 'Outros'))?.id ?? null,
+    descricao: (guardar ? 'Guardado em: ' : 'Retirado de: ') + medit.nome };
+  const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(row) : { error: 1 };
+  if (error) { queue(row); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
+  $('#mval').value = ''; await loadLans(); listarMetas();
 }
 
 // ---- orçamento por categoria ----
@@ -722,6 +796,7 @@ function tempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => loadLans())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'contas' }, async () => { await loadContas(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'metas' }, async () => { await loadMetas(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, async () => { await loadOrcs(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cartoes' }, async () => { await loadCartoes(); render(); })
     .subscribe();
@@ -730,7 +805,7 @@ function tempoReal() {
 async function entrar(user) {
   uid = user.id;
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadOrcs(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
+  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadOrcs(); await loadMetas(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -759,6 +834,12 @@ $('#bmod').onclick = () => baixar('modelo-importacao.csv', '\ufefftipo;data;cate
 $('#bres').onclick = () => { $('#arq').dataset.modo = 'json'; $('#arq').click(); };
 $('#bimp').onclick = () => { $('#arq').dataset.modo = 'csv'; $('#arq').click(); };
 $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.dataset.modo; e.target.value = ''; if (f) await (m === 'json' ? restaurarJson(f) : importarCsv(f)); };
+$('#bmeta').onclick = () => { editarMeta(null); listarMetas(); $('#dmt').showModal(); };
+$('#mfechar').onclick = () => $('#dmt').close();
+$('#mexc').onclick = excluirMeta;
+$('#fm').onsubmit = salvarMeta;
+$('#mguar').onclick = () => moverMeta(true);
+$('#mret').onclick = () => moverMeta(false);
 $('#borc').onclick = () => { listarOrc(); editarOrc(null); $('#dor').showModal(); };
 $('#ofechar').onclick = () => $('#dor').close();
 $('#oexc').onclick = removerOrc;
