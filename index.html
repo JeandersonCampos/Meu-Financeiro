@@ -31,7 +31,7 @@ button{cursor:pointer}
 .duo b{font-size:1.15rem}
 .in{color:var(--in)}.out{color:var(--out)}
 .list{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.br{margin:8px 0}.bt{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}.tr{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px}.tr div{height:100%}.tr .o{background:var(--out)}.tr .i{background:var(--in)}.tr .c{background:var(--pri)}.tr .w{background:var(--warn)}dialog h3{font-size:1rem;margin:20px 0 6px}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg2 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg2 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
+.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.br{margin:8px 0}.bt{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}.tr{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px}.tr div{height:100%}.tr .o{background:var(--out)}.tr .i{background:var(--in)}.tr .c{background:var(--pri)}.tr .w{background:var(--warn)}dialog h3{font-size:1rem;margin:20px 0 6px}.seg3{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg3 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg3 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg2 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg2 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
 .row:last-child{border-bottom:0}.pend .t b{font-style:italic}
 .row .t{flex:1;min-width:0}
 .row .t b,.row .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 14)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 15)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -89,7 +89,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bmeta">Metas</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
+  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bmeta">Metas</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bcat2">Categorias</button><button class="link" id="bbk">Backup</button></div>
   <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
@@ -144,6 +144,16 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <button type="button" id="bkfechar">Fechar</button>
   </div>
   <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
+</dialog>
+<dialog id="dct" style="max-height:92vh;overflow:auto">
+  <form id="fct">
+    <h2>Categorias</h2>
+    <div class="seg3" role="group" aria-label="Tipo"><button type="button" data-k="saida">Saídas</button><button type="button" data-k="entrada">Entradas</button></div>
+    <div id="lct"></div>
+    <label for="cnm">Nome da categoria (toque em uma para renomear)</label><input id="cnm" maxlength="40" placeholder="Nova categoria" required>
+    <div class="acts"><button type="button" id="ctfechar">Fechar</button><button type="button" class="del" id="ctexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
+    <small style="display:block;margin-top:10px;color:var(--mut)">🔒 Categorias usadas automaticamente pelo app (faturas e metas) não podem ser renomeadas nem apagadas.</small>
+  </form>
 </dialog>
 <dialog id="dmt" style="max-height:92vh;overflow:auto">
   <form id="fm">
@@ -239,10 +249,8 @@ const val = (arr, f) => arr.filter(f).reduce((s, l) => s + liq(l), 0);
 async function loadCats(semear = true) {
   const { data, error } = await sb.from('categorias').select('*').order('nome');
   if (error) { cats = lerLS(key('cats'), []); return; }
-  // cria as categorias padrão que ainda não existem (sem duplicar as que você já tem)
-  const tem = new Set(data.map(c => c.tipo + '|' + c.nome.toLowerCase()));
-  const falta = !semear ? [] : [...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))]
-    .filter(c => !tem.has(c.tipo + '|' + c.nome.toLowerCase()));
+  // cria as categorias padrão só na primeira vez (conta sem nenhuma categoria)
+  const falta = !semear || data.length ? [] : [...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))];
   if (falta.length) { await sb.from('categorias').insert(falta); return loadCats(false); }
   cats = data; localStorage.setItem(key('cats'), JSON.stringify(data));
 }
@@ -540,6 +548,42 @@ function infoBackup() {
 function lembrarBackup() {
   const u = localStorage.getItem('cf_ult_backup');
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
+// ---- gerenciar categorias ----
+let ctTipo = 'saida', ctEdit = null;
+const PROTEGIDAS = [['saida', 'Faturas'], ['saida', 'Investimentos e reserva'], ['entrada', 'Outros']];
+const protegida = c => PROTEGIDAS.some(([t, n]) => t === c.tipo && n === c.nome);
+function listarCat() {
+  document.querySelectorAll('.seg3 button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === ctTipo));
+  const box = $('#lct'); box.textContent = '';
+  for (const c of cats.filter(c => c.tipo === ctTipo)) {
+    const n = lans.filter(l => l.categoria_id === c.id).length;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
+    const a = document.createElement('span'); a.textContent = c.nome + (protegida(c) ? ' 🔒' : '');
+    const v = document.createElement('small'); v.style.color = 'var(--mut)'; v.textContent = n + (n === 1 ? ' lançamento' : ' lançamentos'); b.append(a, v);
+    b.onclick = () => editarCat(c); box.append(b);
+  }
+}
+function editarCat(c) { ctEdit = c || null; $('#cnm').value = c?.nome || ''; $('#ctexc').hidden = !c; }
+async function salvarCat(ev) {
+  ev.preventDefault();
+  const nome = $('#cnm').value.trim(); if (!nome) return;
+  const t = ctEdit ? ctEdit.tipo : ctTipo;
+  if (ctEdit && protegida(ctEdit)) return toast('Esta categoria é usada automaticamente pelo app e não pode ser renomeada.');
+  if (cats.some(c => c.tipo === t && c.id !== ctEdit?.id && c.nome.toLowerCase() === nome.toLowerCase())) return toast('Já existe uma categoria com esse nome.');
+  const { error } = await sb.from('categorias').upsert({ id: ctEdit?.id || crypto.randomUUID(), nome, tipo: t });
+  if (error) return toast('Não foi possível salvar agora. Verifique a conexão.');
+  await loadCats(false); editarCat(null); listarCat(); render();
+}
+async function excluirCat() {
+  if (!ctEdit) return;
+  if (protegida(ctEdit)) return toast('Esta categoria é usada automaticamente pelo app e não pode ser apagada.');
+  const n = lans.filter(l => l.categoria_id === ctEdit.id).length, o = orcs.some(x => x.categoria_id === ctEdit.id);
+  if (!confirm('Excluir "' + ctEdit.nome + '"?' + (n ? '\n' + n + ' lançamento(s) ficarão sem categoria.' : '') + (o ? '\nO orçamento dessa categoria também será removido.' : ''))) return;
+  const { error } = await sb.from('categorias').delete().eq('id', ctEdit.id);
+  if (error) return toast('Não foi possível excluir agora. Verifique a conexão.');
+  await loadCats(false); await loadOrcs(); await loadLans(); editarCat(null); listarCat();
 }
 
 // ---- comprovantes ----
@@ -886,7 +930,7 @@ function tempoReal() {
   if (canal) sb.removeChannel(canal);
   canal = sb.channel('rt')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => loadLans())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); if ($('#dct').open) listarCat(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'contas' }, async () => { await loadContas(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'metas' }, async () => { await loadMetas(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, async () => { await loadOrcs(); render(); })
@@ -929,6 +973,11 @@ $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.data
 $('#cpver').onclick = verComprovante;
 $('#cprem').onclick = () => { cpRemover = true; cpUI(editing); };
 $('#lembt').onclick = () => { lembAberto = !($('#lembl').hidden === false); lemb(); };
+$('#bcat2').onclick = () => { ctTipo = 'saida'; editarCat(null); listarCat(); $('#dct').showModal(); };
+$('#ctfechar').onclick = () => $('#dct').close();
+$('#ctexc').onclick = excluirCat;
+$('#fct').onsubmit = salvarCat;
+document.querySelectorAll('.seg3 button').forEach(b => b.onclick = () => { ctTipo = b.dataset.k; editarCat(null); listarCat(); });
 $('#bmeta').onclick = () => { editarMeta(null); listarMetas(); $('#dmt').showModal(); };
 $('#mfechar').onclick = () => $('#dmt').close();
 $('#mexc').onclick = excluirMeta;
