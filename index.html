@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 11)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 12)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -75,6 +75,10 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <button class="ic" id="ant" aria-label="Mês anterior">‹</button>
     <h1 id="mesn"></h1>
     <button class="ic" id="prox" aria-label="Próximo mês">›</button>
+  </div>
+  <div id="lemb" hidden style="background:var(--card);border:1px solid var(--line);border-radius:12px;margin:4px 0 8px;overflow:hidden">
+    <button id="lembt" type="button" style="width:100%;text-align:left;padding:12px 14px;border:0;background:none;font-weight:600"></button>
+    <div id="lembl"></div>
   </div>
   <div class="hero"><small>Saldo previsto no fim do mês</small><div class="big num" id="res"></div><small>Realizado até agora: <span class="num" id="real"></span></small></div>
   <div class="duo">
@@ -301,6 +305,7 @@ function render() {
   $('#res').className = 'big num ' + (prev < 0 ? 'out' : '');
   const al = orcStatus(mes).filter(x => x.pct >= 80), ol = $('#orcl');
   ol.hidden = !al.length; ol.textContent = al.length ? 'Orçamento: ' + al.map(x => x.nome + ' ' + x.pct + '%').join(' · ') : '';
+  lemb();
   const fv = soma(M, l => l.fatura_de), pc = e ? Math.round(fv / e * 100) : null, fl = $('#fatl');
   fl.hidden = !fv;
   if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? '' : ' (' + pc + '% das entradas) · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
@@ -516,6 +521,37 @@ function infoBackup() {
 function lembrarBackup() {
   const u = localStorage.getItem('cf_ult_backup');
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
+}
+
+// ---- lembretes de vencimento ----
+let lembAberto = null;
+const dias = (a, b) => Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5);
+const rotuloDia = d => d < 0 ? 'Atrasado há ' + (-d) + (d === -1 ? ' dia' : ' dias') : d === 0 ? 'Hoje' : d === 1 ? 'Amanhã' : 'Em ' + d + ' dias';
+function lembretes() {
+  const h = hoje();
+  return todas().filter(l => l.status === 'pendente' && !l.cartao_id && dias(h, l.data) <= 3).map(l => ({ l, d: dias(h, l.data) })).sort((a, b) => a.d - b.d);
+}
+function lemb() {
+  const R = lembretes(), box = $('#lemb'); box.hidden = !R.length; if (!R.length) return;
+  const at = R.filter(x => x.d < 0).length, hj = R.filter(x => x.d === 0).length, pr = R.filter(x => x.d > 0).length;
+  const aberto = lembAberto ?? (at + hj > 0);
+  $('#lembt').textContent = (aberto ? '▾ ' : '▸ ') + 'Vencimentos: ' + [at && at + ' em atraso', hj && hj + ' para hoje', pr && pr + ' nos próximos dias'].filter(Boolean).join(' · ');
+  $('#lembt').style.color = at + hj ? 'var(--out)' : 'var(--warn)';
+  const lst = $('#lembl'); lst.textContent = ''; lst.hidden = !aberto;
+  const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
+  for (const { l, d } of R.slice(0, 8)) {
+    const ent = l.tipo === 'entrada', r = document.createElement('div'); r.className = 'row'; r.style.borderTop = '1px solid var(--line)'; r.style.borderBottom = '0';
+    const c = document.createElement('button'); c.className = 'chk'; c.setAttribute('aria-pressed', 'false'); c.setAttribute('aria-label', ent ? 'Marcar como recebido' : 'Marcar como pago');
+    c.innerHTML = '<i></i>'; c.onclick = () => mudarStatus(l);
+    const m = document.createElement('button'); m.className = 'main'; m.onclick = () => l.fatura_de ? toast('Fatura calculada pelas compras do cartão. Marque como paga na bolinha.') : abrir(l);
+    const t = document.createElement('div'); t.className = 't';
+    const b1 = document.createElement('b'); b1.textContent = l.descricao || nome(l.categoria_id);
+    const sp = document.createElement('span'); sp.textContent = rotuloDia(d) + ' · ' + l.data.split('-').reverse().slice(0, 2).join('/') + (ent ? ' · a receber' : ' · a pagar');
+    if (d <= 0) sp.style.color = 'var(--out)'; t.append(b1, sp);
+    const v = document.createElement('div'); v.className = 'num ' + (ent ? 'in' : 'out'); v.textContent = (ent ? '+ ' : '− ') + fmt(l.valor_centavos);
+    m.append(t, v); r.append(c, m); lst.append(r);
+  }
+  if (R.length > 8) { const s = document.createElement('small'); s.style.cssText = 'display:block;padding:8px 14px;color:var(--mut)'; s.textContent = '+ ' + (R.length - 8) + ' outros nos meses anteriores ou seguintes.'; lst.append(s); }
 }
 
 // ---- metas e reserva ----
@@ -834,6 +870,7 @@ $('#bmod').onclick = () => baixar('modelo-importacao.csv', '\ufefftipo;data;cate
 $('#bres').onclick = () => { $('#arq').dataset.modo = 'json'; $('#arq').click(); };
 $('#bimp').onclick = () => { $('#arq').dataset.modo = 'csv'; $('#arq').click(); };
 $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.dataset.modo; e.target.value = ''; if (f) await (m === 'json' ? restaurarJson(f) : importarCsv(f)); };
+$('#lembt').onclick = () => { lembAberto = !($('#lembl').hidden === false); lemb(); };
 $('#bmeta').onclick = () => { editarMeta(null); listarMetas(); $('#dmt').showModal(); };
 $('#mfechar').onclick = () => $('#dmt').close();
 $('#mexc').onclick = excluirMeta;
