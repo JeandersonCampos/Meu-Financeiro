@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 18)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 19)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -202,6 +202,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <h2>Cartões de crédito</h2>
     <div id="lk"></div>
     <button type="button" class="link" id="bpdf" style="margin:8px 0">Importar fatura (PDF)</button>
+    <button type="button" class="link" id="brecalc" style="margin:0 0 8px">Recalcular faturas</button>
     <label for="knome">Nome do cartão</label><input id="knome" maxlength="40" required>
     <label for="kfech">Dia de fechamento</label><input id="kfech" type="number" min="1" max="31" required>
     <label for="kven">Dia de vencimento</label><input id="kven" type="number" min="1" max="31" required>
@@ -329,9 +330,15 @@ function render() {
   const al = orcStatus(mes).filter(x => x.pct >= 80), ol = $('#orcl');
   ol.hidden = !al.length; ol.textContent = al.length ? 'Orçamento: ' + al.map(x => x.nome + ' ' + x.pct + '%').join(' · ') : '';
   lemb();
-  const fv = soma(M, l => l.fatura_de), pc = e ? Math.round(fv / e * 100) : null, fl = $('#fatl');
+  const fv = soma(M, l => l.fatura_de), fl = $('#fatl');
+  let bs = e, ori = 'das entradas do mês';
+  if (!bs) {
+    const ms = [1, 2, 3].map(k => soma(T, l => l.tipo === 'entrada' && l.data.startsWith(addMes(mes, -k)))).filter(Boolean);
+    if (ms.length) { bs = Math.round(ms.reduce((a, b) => a + b, 0) / ms.length); ori = 'da média das entradas dos meses anteriores'; }
+  }
+  const pc = bs ? Math.round(fv / bs * 100) : null;
   fl.hidden = !fv;
-  if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? '' : ' (' + pc + '% das entradas) · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
+  if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? ' · lance suas entradas para ver o percentual' : ' (' + pc + '% ' + ori + ') · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
   const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
   const box = $('#lista'); box.textContent = '';
   if (!ML.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
@@ -373,8 +380,9 @@ function setTipo(t) {
   const st = $('#st'), sv = st.value || 'pago'; st.textContent = '';
   for (const [v, n] of [['pago', t === 'entrada' ? 'Recebido' : 'Pago'], ['pendente', t === 'entrada' ? 'A receber' : 'A pagar']]) { const o = document.createElement('option'); o.value = v; o.textContent = n; st.append(o); }
   st.value = sv;
-  $('#pcbox').hidden = !cartoes.length || t === 'entrada';
-  if (t === 'entrada') $('#pc').value = '';
+  const cred = !!(editing && editing.cartao_id && editing.tipo === 'entrada');
+  $('#pcbox').hidden = !cartoes.length || (t === 'entrada' && !cred);
+  if (t === 'entrada' && !cred) $('#pc').value = '';
   pcmudou();
 }
 function pcmudou() {
@@ -652,7 +660,7 @@ function parseFatura(L, vencMes, cartaoId, dataFech) {
     return { pn: null, pt: null, desc: d.replace(/\s+/g, ' ').trim() };
   };
   const novo = (data, desc, valor, extra) => {
-    const dup = lans.some(l => l.cartao_id === cartaoId && l.data === data && l.valor_centavos === valor), t = tirarParcela(desc);
+    const dup = lans.some(l => l.cartao_id === cartaoId && l.data === data && l.valor_centavos === valor && (l.tipo === 'entrada') === !!(extra && extra.credito)), t = tirarParcela(desc);
     itens.push({ on: !dup, dup, data, desc: t.desc, valor, cat: catPalpite(t.desc), pn: t.pn, pt: t.pt, ...extra });
   };
   for (let i = 0; i < L.length; i++) {
@@ -682,15 +690,16 @@ function parseFatura(L, vencMes, cartaoId, dataFech) {
     if (!v) continue;
     const credito = /^-|-\s?R?\$/.test(v[1].trim()) || /CR|C/i.test((v[2] || '').trim());
     const desc = resto.replace(RE_VALOR, '').replace(/R\$\s*$/, '').replace(/^[•*·]{2,}\s*\d{4}\s+/, '').trim(), valor = valorDe(v[1]);
-    if (credito || RE_PULAR.test(desc)) { ign++; if (credito && valor && !/pagamento|obrigado|anterior/i.test(desc)) cred += valor; continue; }
     if (!valor) continue;
+    const ehPag = /pagamento|pgto|obrigado|anterior|total|saldo|limite|vencimento|fechamento|m[ií]nimo/i.test(desc);
+    if (ehPag || (!credito && RE_PULAR.test(desc))) { ign++; continue; }
     const ano = y ?? (mo > vm ? vy - 1 : vy), data = ano + '-' + pad(mo) + '-' + pad(Math.min(d, new Date(ano, mo, 0).getDate()));
-    novo(data, desc, valor);
+    novo(data, desc, valor, credito ? { credito: true } : undefined);
   }
   return { itens, ign, total: tg || tf, cred };
 }
 function pfResumo() {
-  const sel = pfItens.filter(i => i.on), soma = sel.reduce((s, i) => s + i.valor, 0);
+  const sel = pfItens.filter(i => i.on), soma = sel.reduce((s, i) => s + (i.credito ? -i.valor : i.valor), 0);
   $('#pfok').disabled = !sel.length; $('#pfok').textContent = sel.length ? 'Importar ' + sel.length + (sel.length === 1 ? ' compra' : ' compras') : 'Importar';
   $('#pfv').hidden = !pfLinhas;
   const mostrar = !!pfLinhas && (pfVer || !pfItens.length), pd = $('#pfd'); pd.hidden = !mostrar;
@@ -698,7 +707,7 @@ function pfResumo() {
   if (!pfLinhas) return;
   $('#pfs').textContent = !pfItens.length
     ? 'Não encontrei compras neste PDF. Abaixo estão as linhas com valores que consegui ler. Se elas não mostram as suas compras, me mande uma captura delas, trocando nomes e valores por exemplos.'
-    : sel.length + ' de ' + pfItens.length + ' compras selecionadas · soma ' + fmt(soma) + (pfCred ? ' − créditos ' + fmt(pfCred) + ' = ' + fmt(soma - pfCred) : '') + (pfTotal ? ' · total no PDF: ' + fmt(pfTotal) + (Math.abs(soma - pfCred - pfTotal) < 1 ? ' ✓ confere' : ' (não bate: confira as linhas)') : '') + (pfIgn ? ' · ' + pfIgn + ' linhas ignoradas (pagamentos e créditos)' : '') + '.';
+    : sel.length + ' de ' + pfItens.length + ' compras selecionadas · soma ' + fmt(soma) + (pfTotal ? ' · total no PDF: ' + fmt(pfTotal) + (Math.abs(soma - pfTotal) < 1 ? ' ✓ confere' : ' (não bate: confira as linhas)') : '') + (pfIgn ? ' · ' + pfIgn + ' linhas ignoradas (pagamentos e créditos)' : '') + '.';
 }
 function pfRender() {
   const box = $('#pfl'); box.textContent = '';
@@ -717,7 +726,7 @@ function pfRender() {
     for (const [v, n] of [['', 'Sem categoria'], ...cats.filter(c => c.tipo === 'saida').map(c => [c.id, c.nome])]) { const o = document.createElement('option'); o.value = v; o.textContent = n; ct.append(o); }
     ct.value = it.cat; ct.onchange = () => { it.cat = ct.value; };
     w.append(l1, ds, ct);
-    const nota = [it.pt ? 'Parcela ' + it.pn + ' de ' + it.pt : '', it.semData ? 'Sem data na fatura: usei a data de fechamento.' : '', (cAtual && pfRef && it.data && cicloFatura(cAtual, it.data).ref !== pfRef) ? 'A data original cai em outra fatura. Vou registrar em ' + pfFech.split('-').reverse().slice(0, 2).join('/') + ' (fechamento) para entrar nesta fatura.' : '', it.dup ? 'Já existe um lançamento igual neste cartão (desmarcado).' : ''].filter(Boolean).join(' · ');
+    const nota = [it.credito ? 'Crédito ou estorno: abate o valor da fatura.' : '', it.pt ? 'Parcela ' + it.pn + ' de ' + it.pt : '', it.semData ? 'Sem data na fatura: usei a data de fechamento.' : '', (cAtual && pfRef && it.data && cicloFatura(cAtual, it.data).ref !== pfRef) ? 'A data original cai em outra fatura. Vou registrar em ' + pfFech.split('-').reverse().slice(0, 2).join('/') + ' (fechamento) para entrar nesta fatura.' : '', it.dup ? 'Já existe um lançamento igual neste cartão (desmarcado).' : ''].filter(Boolean).join(' · ');
     if (nota) { const s = document.createElement('small'); s.style.color = it.dup ? 'var(--warn)' : 'var(--mut)'; s.textContent = nota; w.append(s); }
     box.append(w);
   });
@@ -742,8 +751,8 @@ async function pfImportar() {
   const c = cartoes.find(x => x.id === $('#pfc').value); if (!c) return toast('Escolha o cartão.');
   const rows = pfItens.filter(i => i.on && i.valor > 0 && i.data).map(i => {
     const fora = pfRef && cicloFatura(c, i.data).ref !== pfRef, orig = i.data.split('-').reverse().slice(0, 2).join('/');
-    return { id: crypto.randomUUID(), tipo: 'saida', data: fora ? pfFech : i.data, valor_centavos: i.valor, status: 'pago', conta_id: null,
-      cartao_id: c.id, categoria_id: i.cat || null, descricao: ((i.desc.trim() || 'Compra') + (fora ? ' (compra em ' + orig + ')' : '')), parcela_n: i.pn, parcela_total: i.pt };
+    return { id: crypto.randomUUID(), tipo: i.credito ? 'entrada' : 'saida', data: fora ? pfFech : i.data, valor_centavos: i.valor, status: 'pago', conta_id: null,
+      cartao_id: c.id, categoria_id: i.credito ? null : (i.cat || null), descricao: ((i.desc.trim() || 'Compra') + (fora ? ' (compra em ' + orig + ')' : '')), parcela_n: i.pn, parcela_total: i.pt };
   });
   if (!rows.length) return;
   if (!navigator.onLine) { rows.forEach(r => queue(r)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
@@ -1009,7 +1018,7 @@ function painel() {
   const TA = todas(), T = TA.filter(l => !l.cartao_id), pre = aba === 'm' ? mes : mes.slice(0, 4), box = $('#pb');
   $('#ptit').textContent = aba === 'm' ? rotMes(mes) : mes.slice(0, 4);
   const P = TA.filter(l => l.data.startsWith(pre)), kn = id => cartoes.find(c => c.id === id)?.nome || 'Cartão';
-  const gastos = P.filter(l => l.tipo === 'saida' && !l.fatura_de), compras = P.filter(l => l.cartao_id);
+  const gastos = P.filter(l => l.tipo === 'saida' && !l.fatura_de), compras = P.filter(l => l.cartao_id && l.tipo === 'saida');
   box.textContent = '';
   if (aba === 'a') {
     const ano = mes.slice(0, 4), meses = MESES.map((_, i) => ano + '-' + pad(i + 1));
@@ -1033,8 +1042,9 @@ function painel() {
     box.append(s);
   }
   box.append(barras('Gastos por categoria', rank(gastos, l => nomeCat(l.categoria_id)), 'o'),
-    barras('Entradas por categoria', rank(P.filter(l => l.tipo === 'entrada'), l => nomeCat(l.categoria_id)), 'i'),
-    barras('Compras por cartão', rank(compras, l => kn(l.cartao_id)), 'c'));
+    barras('Entradas por categoria', rank(P.filter(l => l.tipo === 'entrada' && !l.cartao_id), l => nomeCat(l.categoria_id)), 'i'),
+    barras('Faturas por cartão (pelo vencimento)', rank(P.filter(l => l.fatura_de), l => kn(l.fatura_de)), 'c'),
+    barras('Compras por cartão (pela data da compra)', rank(compras, l => kn(l.cartao_id)), 'c'));
 }
 function mudarPeriodo(n) { mes = addMes(mes, aba === 'm' ? n : 12 * n); render(); painel(); }
 
@@ -1045,30 +1055,40 @@ function cicloFatura(c, data) {
   return { ref, venc: dataMais(ref + '-' + pad(c.dia_vencimento), c.dia_vencimento > c.dia_fechamento ? 0 : 1) };
 }
 
+function calcAlvo() {
+  const alvo = {};
+  for (const l of lans) {
+    const c = l.cartao_id && cartoes.find(k => k.id === l.cartao_id); if (!c) continue;
+    const { ref, venc } = cicloFatura(c, l.data);
+    (alvo[c.id + '|' + ref] ??= { c, ref, venc, total: 0 }).total += (l.tipo === 'entrada' ? -1 : 1) * l.valor_centavos;
+  }
+  for (const k of Object.keys(alvo)) if (alvo[k].total <= 0) delete alvo[k];
+  return alvo;
+}
+
 let sincAtivo = false;
-async function sincronizarFaturas() {
-  if (sincAtivo || !navigator.onLine) return;
+async function sincronizarFaturas(manual = false) {
+  if (sincAtivo || !navigator.onLine) { if (manual) toast('Sem conexão para atualizar as faturas.'); return; }
   sincAtivo = true;
   try {
-    const alvo = {}, exist = {}, catF = cats.find(c => c.nome === 'Faturas' && c.tipo === 'saida')?.id ?? null;
-    for (const l of lans) {
-      const c = l.cartao_id && cartoes.find(k => k.id === l.cartao_id); if (!c) continue;
-      const { ref, venc } = cicloFatura(c, l.data);
-      (alvo[c.id + '|' + ref] ??= { c, ref, venc, total: 0 }).total += l.valor_centavos;
-    }
+    const alvo = calcAlvo(), exist = {}, catF = cats.find(c => c.nome === 'Faturas' && c.tipo === 'saida')?.id ?? null;
     for (const l of lans) if (l.fatura_de) exist[l.fatura_de + '|' + l.fatura_ref] = l;
-    const up = [], del = [];
+    const novos = [], mudar = [], del = [];
     for (const [k, a] of Object.entries(alvo)) {
       const f = exist[k];
-      if (!f) up.push({ id: crypto.randomUUID(), tipo: 'saida', status: 'pendente', descricao: 'Fatura ' + a.c.nome, valor_centavos: a.total, data: a.venc, categoria_id: catF, conta_id: a.c.conta_id, fatura_de: a.c.id, fatura_ref: a.ref });
-      else if (f.valor_centavos !== a.total || f.data !== a.venc) up.push({ ...f, valor_centavos: a.total, data: a.venc });
+      if (!f) novos.push({ id: crypto.randomUUID(), tipo: 'saida', status: 'pendente', descricao: 'Fatura ' + a.c.nome, valor_centavos: a.total, data: a.venc, categoria_id: catF, conta_id: a.c.conta_id, fatura_de: a.c.id, fatura_ref: a.ref });
+      else if (f.valor_centavos !== a.total || f.data !== a.venc) mudar.push({ id: f.id, valor_centavos: a.total, data: a.venc });
     }
     for (const [k, f] of Object.entries(exist)) if (!alvo[k] && f.status !== 'pago') del.push(f.id);
-    let ok = true;
-    if (up.length) ok = !(await sb.from('lancamentos').upsert(up)).error;
-    if (del.length) ok = !(await sb.from('lancamentos').delete().in('id', del)).error && ok;
+    let falha = null;
+    if (novos.length) { const { error } = await sb.from('lancamentos').insert(novos); if (error && error.code !== '23505') falha = error; }
+    for (const x of mudar) { const { error } = await sb.from('lancamentos').update({ valor_centavos: x.valor_centavos, data: x.data }).eq('id', x.id); if (error) falha = falha || error; }
+    if (del.length) { const { error } = await sb.from('lancamentos').delete().in('id', del); if (error) falha = falha || error; }
     sincAtivo = false;
-    if (ok && (up.length || del.length)) await loadLans();
+    if (falha) return toast('Não consegui atualizar as faturas: ' + falha.message);
+    const n = novos.length + mudar.length + del.length;
+    if (n) await loadLans();
+    if (manual) toast(n ? n + ' fatura(s) atualizada(s).' : 'As faturas já estão atualizadas.');
   } finally { sincAtivo = false; }
 }
 
@@ -1186,6 +1206,7 @@ $('#cpver').onclick = verComprovante;
 $('#cprem').onclick = () => { cpRemover = true; cpUI(editing); };
 $('#lembt').onclick = () => { lembAberto = !($('#lembl').hidden === false); lemb(); };
 $('#bpdf').onclick = abrirImportacao;
+$('#brecalc').onclick = () => sincronizarFaturas(true);
 $('#pfa').onchange = e => pfArquivo(e.target.files[0]);
 $('#pfm').onchange = pfParse;
 $('#pfc').onchange = pfParse;
