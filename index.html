@@ -9,8 +9,8 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#1f4d3f">
 <style>
-:root{--bg:#eef1ee;--card:#fff;--ink:#14231f;--mut:#5d6b66;--line:#d9dfdb;--in:#1b7a57;--out:#bf3f2b;--pri:#1f4d3f;--onpri:#fff}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#18231f;--ink:#e8efeb;--mut:#93a39c;--line:#2a3a34;--in:#4cc38f;--out:#ff8a73;--pri:#4cc38f;--onpri:#0f1714}}
+:root{--bg:#eef1ee;--card:#fff;--ink:#14231f;--mut:#5d6b66;--line:#d9dfdb;--in:#1b7a57;--out:#bf3f2b;--pri:#1f4d3f;--onpri:#fff;--warn:#b7791f}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#18231f;--ink:#e8efeb;--mut:#93a39c;--line:#2a3a34;--in:#4cc38f;--out:#ff8a73;--pri:#4cc38f;--onpri:#0f1714;--warn:#e0b44c}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top)}
@@ -31,7 +31,7 @@ button{cursor:pointer}
 .duo b{font-size:1.15rem}
 .in{color:var(--in)}.out{color:var(--out)}
 .list{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.br{margin:8px 0}.bt{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}.tr{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px}.tr div{height:100%}.tr .o{background:var(--out)}.tr .i{background:var(--in)}.tr .c{background:var(--pri)}dialog h3{font-size:1rem;margin:20px 0 6px}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg2 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg2 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
+.row{display:flex;align-items:center;border-bottom:1px solid var(--line)}.row .main{display:flex;gap:12px;align-items:center;flex:1;min-width:0;padding:12px 14px 12px 0;border:0;background:none;text-align:left}.chk{flex:none;width:44px;height:44px;border:0;background:none;display:grid;place-items:center}.chk i{width:24px;height:24px;border:2px solid var(--mut);border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:.85rem;line-height:1}.chk[aria-pressed=true] i{background:var(--in);border-color:var(--in);color:var(--bg)}.br{margin:8px 0}.bt{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}.tr{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:3px}.tr div{height:100%}.tr .o{background:var(--out)}.tr .i{background:var(--in)}.tr .c{background:var(--pri)}.tr .w{background:var(--warn)}dialog h3{font-size:1rem;margin:20px 0 6px}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}.seg2 button{padding:10px;border:1px solid var(--line);border-radius:10px;background:none}.seg2 button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}.link{display:block;margin:0 auto 16px;border:0;background:none;color:var(--pri);text-decoration:underline}dialog h2{margin:0 0 8px;font-size:1.1rem}.cl{display:flex;justify-content:space-between;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left}
 .row:last-child{border-bottom:0}.pend .t b{font-style:italic}
 .row .t{flex:1;min-width:0}
 .row .t b,.row .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -61,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 9)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 10)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -85,7 +85,8 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <div><small>A receber</small><b class="in num" id="arec"></b></div>
     <div><small>A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
+  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bbk">Backup</button></div>
+  <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="list" id="lista"></div>
   <button class="sair" id="sair">Sair da conta</button>
@@ -136,6 +137,15 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <button type="button" id="bkfechar">Fechar</button>
   </div>
   <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
+</dialog>
+<dialog id="dor">
+  <form id="fo">
+    <h2>Orçamento mensal por categoria</h2>
+    <div id="lo"></div>
+    <label for="ocat">Categoria</label><select id="ocat"></select>
+    <label for="oval">Limite por mês (R$)</label><input id="oval" inputmode="decimal" placeholder="0,00" required>
+    <div class="acts"><button type="button" id="ofechar">Fechar</button><button type="button" class="del" id="oexc" hidden>Remover</button><button class="ok">Salvar</button></div>
+  </form>
 </dialog>
 <dialog id="dpn" style="max-height:92vh;overflow:auto">
   <div class="nav"><button class="ic" id="pant" aria-label="Período anterior">‹</button><h2 id="ptit" style="margin:0;text-transform:capitalize"></h2><button class="ic" id="pprox" aria-label="Próximo período">›</button></div>
@@ -189,7 +199,7 @@ const pad = n => String(n).padStart(2, '0');
 const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
 const addMes = (m, n) => { const [y, k] = m.split('-').map(Number); const d = new Date(y, k - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
 
-let uid, cats = [], cartoes = [], kedit = null, contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
+let uid, cats = [], orcs = [], oedit = null, cartoes = [], kedit = null, contas = [], lans = [], mes = hoje().slice(0, 7), editing = null, cedit = null, tipo = 'saida', canal = null;
 
 const key = k => 'cf_' + uid + '_' + k;
 const lerLS = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
@@ -218,6 +228,12 @@ async function loadContas() {
   const { data, error } = await sb.from('contas').select('*').order('nome');
   if (error) { contas = lerLS(key('contas'), []); return; }
   contas = data; localStorage.setItem(key('contas'), JSON.stringify(data));
+}
+
+async function loadOrcs() {
+  const { data, error } = await sb.from('orcamentos').select('*');
+  if (error) { orcs = lerLS(key('orcs'), []); if (/relation|orcamentos/.test(error.message)) erro('rode o arquivo migracao-etapa7a.sql no SQL Editor do Supabase.'); return; }
+  orcs = data; localStorage.setItem(key('orcs'), JSON.stringify(data));
 }
 
 async function loadCartoes() {
@@ -261,6 +277,8 @@ function render() {
   const set = (id, v) => $(id).textContent = fmt(v);
   set('#tin', e); set('#tout', s); set('#arec', ar); set('#apag', ap); set('#sini', ant); set('#sres', e - s); set('#real', real); set('#res', prev);
   $('#res').className = 'big num ' + (prev < 0 ? 'out' : '');
+  const al = orcStatus(mes).filter(x => x.pct >= 80), ol = $('#orcl');
+  ol.hidden = !al.length; ol.textContent = al.length ? 'Orçamento: ' + al.map(x => x.nome + ' ' + x.pct + '%').join(' · ') : '';
   const fv = soma(M, l => l.fatura_de), pc = e ? Math.round(fv / e * 100) : null, fl = $('#fatl');
   fl.hidden = !fv;
   if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? '' : ' (' + pc + '% das entradas) · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
@@ -478,6 +496,45 @@ function lembrarBackup() {
   if (!u || mesesEntre(u, hoje()) >= 1) setTimeout(() => toast('Faça um backup: toque em Backup e depois em Baixar backup.'), 4500);
 }
 
+// ---- orçamento por categoria ----
+function orcStatus(m) {
+  const g = {};
+  for (const l of todas()) if (l.tipo === 'saida' && !l.fatura_de && l.categoria_id && l.data.startsWith(m)) g[l.categoria_id] = (g[l.categoria_id] || 0) + l.valor_centavos;
+  return orcs.map(o => ({ id: o.categoria_id, nome: cats.find(c => c.id === o.categoria_id)?.nome || 'Categoria', limite: o.valor_centavos, gasto: g[o.categoria_id] || 0 }))
+    .map(x => ({ ...x, pct: Math.round(x.gasto / x.limite * 100) })).sort((a, b) => b.pct - a.pct);
+}
+function listarOrc() {
+  const box = $('#lo'); box.textContent = '';
+  if (!orcs.length) { const p = document.createElement('p'); p.className = 'empty'; p.style.padding = '8px 0'; p.textContent = 'Nenhum orçamento definido. Escolha uma categoria abaixo e informe o limite mensal.'; box.append(p); }
+  for (const x of orcStatus(mes)) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
+    const a = document.createElement('span'); a.textContent = x.nome;
+    const v = document.createElement('b'); v.className = 'num'; v.textContent = fmt(x.limite) + ' · ' + x.pct + '% usado'; b.append(a, v);
+    b.onclick = () => editarOrc(orcs.find(o => o.categoria_id === x.id)); box.append(b);
+  }
+  const s = $('#ocat'); s.textContent = '';
+  for (const c of cats.filter(c => c.tipo === 'saida')) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nome; s.append(o); }
+}
+function editarOrc(o) {
+  oedit = o || null; const s = $('#ocat');
+  if (o) s.value = o.categoria_id; else s.value = cats.find(c => c.tipo === 'saida' && !orcs.some(x => x.categoria_id === c.id))?.id || s.value;
+  s.disabled = !!o; $('#oval').value = o ? (o.valor_centavos / 100).toFixed(2).replace('.', ',') : ''; $('#oexc').hidden = !o;
+}
+async function salvarOrc(ev) {
+  ev.preventDefault();
+  const v = parseValor($('#oval').value); if (!v) return toast('Informe um limite maior que zero.');
+  const cat = oedit ? oedit.categoria_id : $('#ocat').value, ex = orcs.find(o => o.categoria_id === cat);
+  const { error } = await sb.from('orcamentos').upsert({ id: ex?.id || crypto.randomUUID(), categoria_id: cat, valor_centavos: v });
+  if (error) return toast('Não foi possível salvar o orçamento agora. Verifique a conexão.');
+  await loadOrcs(); editarOrc(null); listarOrc(); render(); if ($('#dpn').open) painel();
+}
+async function removerOrc() {
+  if (!oedit || !confirm('Remover o orçamento desta categoria?')) return;
+  const { error } = await sb.from('orcamentos').delete().eq('id', oedit.id);
+  if (error) return toast('Não foi possível remover agora.');
+  await loadOrcs(); editarOrc(null); listarOrc(); render(); if ($('#dpn').open) painel();
+}
+
 // ---- painéis ----
 let aba = 'm';
 const rotMes = m => new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -540,6 +597,18 @@ function painel() {
     const d = document.createElement('div');
     d.innerHTML = '<h3>Entradas × saídas por mês</h3>' + svgAnual(ent, sai) + '<small style="color:var(--mut)">Verde: entradas. Vermelho: saídas (a fatura conta no vencimento).</small><h3>Saldo previsto no fim de cada mês</h3>' + svgSaldo(saldo);
     box.append(d);
+  }
+  if (aba === 'm' && orcs.length) {
+    const s = document.createElement('section'), t = document.createElement('h3'); t.textContent = 'Orçamento do mês'; s.append(t);
+    for (const x of orcStatus(mes)) {
+      const r = document.createElement('div'); r.className = 'br';
+      const a = document.createElement('div'); a.className = 'bt';
+      const n = document.createElement('span'); n.textContent = x.nome;
+      const v = document.createElement('span'); v.className = 'num'; v.textContent = fmt(x.gasto) + ' de ' + fmt(x.limite) + ' · ' + x.pct + '%'; a.append(n, v);
+      const tr = document.createElement('div'); tr.className = 'tr'; const f = document.createElement('div');
+      f.className = x.pct > 100 ? 'o' : x.pct >= 80 ? 'w' : 'c'; f.style.width = Math.min(100, x.pct) + '%'; tr.append(f); r.append(a, tr); s.append(r);
+    }
+    box.append(s);
   }
   box.append(barras('Gastos por categoria', rank(gastos, l => nomeCat(l.categoria_id)), 'o'),
     barras('Entradas por categoria', rank(P.filter(l => l.tipo === 'entrada'), l => nomeCat(l.categoria_id)), 'i'),
@@ -653,6 +722,7 @@ function tempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => loadLans())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'categorias' }, async () => { await loadCats(false); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'contas' }, async () => { await loadContas(); render(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, async () => { await loadOrcs(); render(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'cartoes' }, async () => { await loadCartoes(); render(); })
     .subscribe();
 }
@@ -660,7 +730,7 @@ function tempoReal() {
 async function entrar(user) {
   uid = user.id;
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
+  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadOrcs(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -689,6 +759,11 @@ $('#bmod').onclick = () => baixar('modelo-importacao.csv', '\ufefftipo;data;cate
 $('#bres').onclick = () => { $('#arq').dataset.modo = 'json'; $('#arq').click(); };
 $('#bimp').onclick = () => { $('#arq').dataset.modo = 'csv'; $('#arq').click(); };
 $('#arq').onchange = async e => { const f = e.target.files[0], m = e.target.dataset.modo; e.target.value = ''; if (f) await (m === 'json' ? restaurarJson(f) : importarCsv(f)); };
+$('#borc').onclick = () => { listarOrc(); editarOrc(null); $('#dor').showModal(); };
+$('#ofechar').onclick = () => $('#dor').close();
+$('#oexc').onclick = removerOrc;
+$('#fo').onsubmit = salvarOrc;
+$('#orcl').onclick = () => { aba = 'm'; painel(); $('#dpn').showModal(); };
 $('#bpain').onclick = () => { painel(); $('#dpn').showModal(); };
 $('#pfechar').onclick = () => $('#dpn').close();
 $('#pant').onclick = () => mudarPeriodo(-1);
