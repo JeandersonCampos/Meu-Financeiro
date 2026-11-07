@@ -12,6 +12,7 @@
 :root{--bg:#eef1ee;--card:#fff;--ink:#14231f;--mut:#5d6b66;--line:#d9dfdb;--in:#1b7a57;--out:#bf3f2b;--pri:#1f4d3f;--onpri:#fff}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1714;--card:#18231f;--ink:#e8efeb;--mut:#93a39c;--line:#2a3a34;--in:#4cc38f;--out:#ff8a73;--pri:#4cc38f;--onpri:#0f1714}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top)}
 main{max-width:640px;margin:0 auto;padding:12px 16px calc(96px + env(safe-area-inset-bottom))}
 button,input,select{font:inherit;color:inherit}
@@ -60,7 +61,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 
 <section id="login">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 8)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 9)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -99,7 +100,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     </div>
     <label for="valor" id="lv">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
     <label for="data">Data</label><input id="data" type="date" required>
-    <div id="pcbox"><label for="pc">Pagar com</label><select id="pc"></select></div>
+    <div id="pcbox"><label for="pc">Pagar com</label><select id="pc"></select><small id="pcinfo" style="display:block;margin-top:6px;color:var(--mut)"></small></div>
     <label for="st" id="lst">Situação</label><select id="st"></select>
     <label for="cn" id="lcn">Conta</label><select id="cn"></select>
     <label for="cat">Categoria</label><select id="cat"></select>
@@ -182,8 +183,8 @@ if (falha) { erro(falha); parou = true; throw new Error(falha); }
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
 const fmt = c => (c / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-const CAT_S = ['Moradia','Mercado','Luz','Água','Internet','Transporte','Gás','Saúde','Educação','Faturas','Dízimo e doações','Assinaturas'];
-const CAT_E = ['Trabalho fixo','Renda extra','Bônus','Pensão','Vendas','Pró-labore'];
+const CAT_S = ['Moradia','Mercado','Restaurantes e delivery','Luz','Água','Gás','Internet','Celular e telefone','Transporte','Combustível','Saúde','Farmácia','Educação','Faturas','Dízimo e doações','Assinaturas','Vestuário','Lazer e entretenimento','Viagens','Beleza e cuidados pessoais','Pets','Filhos e família','Presentes','Casa e manutenção','Seguros','Impostos e taxas','Empréstimos e financiamentos','Tarifas bancárias','Investimentos e reserva','Compras diversas','Outros'];
+const CAT_E = ['Trabalho fixo','Renda extra','Bônus','13º salário','Férias','Pensão','Aposentadoria e benefícios','Vendas','Pró-labore','Aluguéis recebidos','Rendimentos de investimentos','Reembolsos','Restituição de impostos','Presentes recebidos','Outros'];
 const pad = n => String(n).padStart(2, '0');
 const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
 const addMes = (m, n) => { const [y, k] = m.split('-').map(Number); const d = new Date(y, k - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
@@ -205,10 +206,11 @@ const val = (arr, f) => arr.filter(f).reduce((s, l) => s + liq(l), 0);
 async function loadCats(semear = true) {
   const { data, error } = await sb.from('categorias').select('*').order('nome');
   if (error) { cats = lerLS(key('cats'), []); return; }
-  if (!data.length && semear) {
-    await sb.from('categorias').insert([...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))]);
-    return loadCats(false);
-  }
+  // cria as categorias padrão que ainda não existem (sem duplicar as que você já tem)
+  const tem = new Set(data.map(c => c.tipo + '|' + c.nome.toLowerCase()));
+  const falta = !semear ? [] : [...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))]
+    .filter(c => !tem.has(c.tipo + '|' + c.nome.toLowerCase()));
+  if (falta.length) { await sb.from('categorias').insert(falta); return loadCats(false); }
   cats = data; localStorage.setItem(key('cats'), JSON.stringify(data));
 }
 
@@ -307,7 +309,12 @@ function setTipo(t) {
   if (t === 'entrada') $('#pc').value = '';
   pcmudou();
 }
-function pcmudou() { const k = !!$('#pc').value; $('#st').hidden = $('#lst').hidden = $('#cn').hidden = $('#lcn').hidden = k; }
+function pcmudou() {
+  const k = !!$('#pc').value; $('#st').hidden = $('#lst').hidden = $('#cn').hidden = $('#lcn').hidden = k;
+  const c = cartoes.find(x => x.id === $('#pc').value), el = $('#pcinfo');
+  if (!c || !$('#data').value) { el.textContent = ''; return; }
+  el.textContent = (editing || $('#rep').value === '1' ? 'Esta compra entra' : 'A primeira compra entra') + ' na fatura que vence em ' + cicloFatura(c, $('#data').value).venc.split('-').reverse().join('/') + '.';
+}
 
 function abrir(l) {
   editing = l || null;
@@ -389,7 +396,7 @@ async function gerarFixos() {
     if (ult.data.slice(0, 7) >= addMes(mesAtual, 6)) continue;
     for (let k = mesesEntre(prim.data, ult.data) + 1; dataMais(prim.data, k).slice(0, 7) <= alvo; k++)
       novos.push({ id: crypto.randomUUID(), tipo: ult.tipo, valor_centavos: ult.valor_centavos, categoria_id: ult.categoria_id, conta_id: ult.conta_id,
-        descricao: ult.descricao, grupo_id: ult.grupo_id, recorrente: true, status: 'pendente', data: dataMais(prim.data, k) });
+        descricao: ult.descricao, grupo_id: ult.grupo_id, recorrente: true, cartao_id: ult.cartao_id ?? null, status: ult.cartao_id ? 'pago' : 'pendente', data: dataMais(prim.data, k) });
   }
   if (novos.length) { await sb.from('lancamentos').upsert(novos, { onConflict: 'grupo_id,data', ignoreDuplicates: true }); await loadLans(); }
 }
@@ -692,6 +699,7 @@ $('#kfechar').onclick = () => $('#dk').close();
 $('#kexc').onclick = excluirCartao;
 $('#fk').onsubmit = salvarCartao;
 $('#pc').onchange = pcmudou;
+$('#data').onchange = pcmudou;
 $('#cexc').onclick = excluirConta;
 $('#fc').onsubmit = salvarConta;
 $('#novo').onclick = () => abrir(null);
@@ -699,7 +707,7 @@ $('#canc').onclick = () => $('#dlg').close();
 $('#exc').onclick = excluir;
 $('#fd').onsubmit = salvar;
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTipo(b.dataset.t));
-$('#rep').onchange = () => { const p = $('#rep').value === 'p'; $('#np').hidden = !p; $('#lv').textContent = p ? 'Valor de cada parcela (R$)' : 'Valor (R$)'; };
+$('#rep').onchange = () => { pcmudou(); const p = $('#rep').value === 'p'; $('#np').hidden = !p; $('#lv').textContent = p ? 'Valor de cada parcela (R$)' : 'Valor (R$)'; };
 window.addEventListener('online', async () => { await flush(); loadLans(); });
 
 (async () => {
