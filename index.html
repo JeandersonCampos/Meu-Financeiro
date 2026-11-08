@@ -20,7 +20,7 @@ button{cursor:pointer}
 :focus-visible{outline:3px solid var(--pri);outline-offset:2px}
 .num{font-variant-numeric:tabular-nums}
 .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.nav h1{font-size:1rem;font-weight:600;margin:0;text-transform:capitalize}
+.nav h1{font-size:1rem;font-weight:600;margin:0}#ptit::first-letter,.nav h1::first-letter{text-transform:uppercase}
 .ic{width:44px;height:44px;border:0;background:none;font-size:1.4rem;border-radius:50%}
 .hero{padding:20px 4px 16px}
 .hero small{color:var(--mut)}
@@ -55,13 +55,45 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 #msg{min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--out)}
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;display:none}
 .sair{border:0;background:none;color:var(--mut);margin-top:24px;text-decoration:underline}
+
+:root{--tint:#e3eee9}
+@media(prefers-color-scheme:dark){:root{--tint:#22372f}}
+.i{flex:none}
+[data-i]{display:inline-flex;align-items:center;vertical-align:middle}
+.topo{display:flex;align-items:center;gap:10px;padding:2px 2px 8px}
+.topo img{width:34px;height:34px;border-radius:9px;display:block}
+.topo b{font-size:1.05rem;letter-spacing:-.01em}
+.hero{background:linear-gradient(135deg,#2a7a5c,#173f33);color:#fff;border-radius:18px;padding:18px 18px 16px;margin:6px 0 12px;box-shadow:0 6px 18px rgba(23,63,51,.25)}
+.hero small{color:rgba(255,255,255,.78)}
+.hero .big.out{color:#ffb4a6}
+.duo small{display:flex;align-items:center;gap:6px}
+.duo small [data-i]{color:var(--mut)}
+.acoes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}
+.ac{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 2px;border:1px solid var(--line);border-radius:14px;background:var(--card);font-size:.72rem;color:var(--ink)}
+.ac .ib{width:38px;height:38px;border-radius:12px;justify-content:center;background:var(--tint);color:var(--pri)}
+.fbar{display:flex;gap:8px;margin:0 0 8px}
+.busca{position:relative;flex:1}
+.busca [data-i]{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut);pointer-events:none}
+.busca input{padding-left:38px}
+.fbtn{position:relative;flex:none;width:46px;border:1px solid var(--line);border-radius:10px;background:var(--card);display:grid;place-items:center;color:var(--ink)}
+.fbtn em{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;background:var(--pri);color:var(--onpri);font-size:.7rem;font-style:normal;display:grid;place-items:center;padding:0 4px}
+.chips{display:flex;gap:6px;margin:0 0 10px}
+.chips button{padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:.85rem}
+.chips button[aria-pressed=true]{background:var(--pri);color:var(--onpri);border-color:var(--pri)}
+.fab{display:grid;place-items:center}
+.sair{display:inline-flex;align-items:center;gap:6px}
+.acts button,.seg button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+dialog h2{display:flex;align-items:center;gap:8px}
+.ck{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:.95rem}
+.ck input{width:20px;height:20px;flex:none}
 </style>
 </head>
 <body>
 
 <section id="login">
+  <img src="logo.svg" alt="" width="72" height="72" style="border-radius:18px;margin-bottom:14px;display:block">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 19)</small></p>
+  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 20)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
@@ -71,37 +103,54 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 </section>
 
 <main id="app" hidden>
+  <div class="topo"><img src="logo.svg" alt=""><b>Meu Financeiro</b></div>
   <div class="nav">
-    <button class="ic" id="ant" aria-label="Mês anterior">‹</button>
+    <button class="ic" id="ant" aria-label="Mês anterior"><span data-i="chevL" data-s="22"></span></button>
     <h1 id="mesn"></h1>
-    <button class="ic" id="prox" aria-label="Próximo mês">›</button>
+    <button class="ic" id="prox" aria-label="Próximo mês"><span data-i="chevR" data-s="22"></span></button>
   </div>
   <div id="lemb" hidden style="background:var(--card);border:1px solid var(--line);border-radius:12px;margin:4px 0 8px;overflow:hidden">
-    <button id="lembt" type="button" style="width:100%;text-align:left;padding:12px 14px;border:0;background:none;font-weight:600"></button>
+    <button id="lembt" type="button" style="width:100%;text-align:left;padding:12px 14px;border:0;background:none;font-weight:600;display:flex;align-items:center;gap:6px"></button>
     <div id="lembl"></div>
   </div>
   <div class="hero"><small>Saldo previsto no fim do mês</small><div class="big num" id="res"></div><small>Realizado até agora: <span class="num" id="real"></span></small></div>
   <div class="duo">
-    <div><small>Saldo inicial</small><b class="num" id="sini"></b></div>
-    <div><small>Resultado do mês</small><b class="num" id="sres"></b></div>
-    <div><small>Entradas</small><b class="in num" id="tin"></b></div>
-    <div><small>Saídas</small><b class="out num" id="tout"></b></div>
-    <div><small>A receber</small><b class="in num" id="arec"></b></div>
-    <div><small>A pagar</small><b class="out num" id="apag"></b></div>
+    <div><small><span data-i="landmark" data-s="15"></span> Saldo inicial</small><b class="num" id="sini"></b></div>
+    <div><small><span data-i="activity" data-s="15"></span> Resultado do mês</small><b class="num" id="sres"></b></div>
+    <div><small><span data-i="arrowDown" data-s="15"></span> Entradas</small><b class="in num" id="tin"></b></div>
+    <div><small><span data-i="arrowUp" data-s="15"></span> Saídas</small><b class="out num" id="tout"></b></div>
+    <div><small><span data-i="clock" data-s="15"></span> A receber</small><b class="in num" id="arec"></b></div>
+    <div><small><span data-i="clock" data-s="15"></span> A pagar</small><b class="out num" id="apag"></b></div>
   </div>
-  <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:4px 20px"><button class="link" id="bpain">Painéis</button><button class="link" id="borc">Orçamentos</button><button class="link" id="bmeta">Metas</button><button class="link" id="bcontas">Contas e saldos</button><button class="link" id="bcart">Cartões</button><button class="link" id="bcat2">Categorias</button><button class="link" id="bbk">Backup</button></div>
+  <div class="acoes">
+    <button class="ac" id="bpain"><span class="ib" data-i="chart" data-s="22"></span>Painéis</button>
+    <button class="ac" id="borc"><span class="ib" data-i="target" data-s="22"></span>Orçamentos</button>
+    <button class="ac" id="bmeta"><span class="ib" data-i="flag" data-s="22"></span>Metas</button>
+    <button class="ac" id="bcontas"><span class="ib" data-i="wallet" data-s="22"></span>Contas</button>
+    <button class="ac" id="bcart"><span class="ib" data-i="card" data-s="22"></span>Cartões</button>
+    <button class="ac" id="bcat2"><span class="ib" data-i="tag" data-s="22"></span>Categorias</button>
+    <button class="ac" id="bbk"><span class="ib" data-i="backup" data-s="22"></span>Backup</button>
+  </div>
   <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
+  <div class="fbar">
+    <div class="busca"><span data-i="search" data-s="18"></span><input id="fq" type="search" placeholder="Buscar lançamentos" aria-label="Buscar lançamentos" autocomplete="off"></div>
+    <button class="fbtn" id="fbtn" type="button" aria-label="Mais filtros"><span data-i="sliders" data-s="20"></span><em id="fcount" hidden></em></button>
+  </div>
+  <div class="chips" role="group" aria-label="Tipo de lançamento">
+    <button type="button" data-ft="">Todos</button><button type="button" data-ft="entrada">Entradas</button><button type="button" data-ft="saida">Saídas</button>
+  </div>
+  <p id="finfo" hidden style="margin:0 0 8px;font-size:.85rem;color:var(--mut)"></p>
   <div class="list" id="lista"></div>
-  <button class="sair" id="sair">Sair da conta</button>
+  <button class="sair" id="sair"><span data-i="logout" data-s="16"></span> Sair da conta</button>
 </main>
-<button class="fab" id="novo" aria-label="Novo lançamento" hidden>+</button>
+<button class="fab" id="novo" aria-label="Novo lançamento" hidden><span data-i="plus" data-s="28"></span></button>
 
 <dialog id="dlg">
   <form id="fd">
     <div class="seg" role="group" aria-label="Tipo">
-      <button type="button" data-t="saida">Saída</button>
-      <button type="button" data-t="entrada">Entrada</button>
+      <button type="button" data-t="saida"><span data-i="arrowUp" data-s="16"></span> Saída</button>
+      <button type="button" data-t="entrada"><span data-i="arrowDown" data-s="16"></span> Entrada</button>
     </div>
     <label for="valor" id="lv">Valor (R$)</label><input id="valor" inputmode="decimal" placeholder="0,00" required>
     <label for="data">Data</label><input id="data" type="date" required>
@@ -112,7 +161,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
     <label for="desc">Descrição</label><input id="desc" maxlength="120">
     <label for="cpf">Comprovante (foto ou PDF)</label><input id="cpf" type="file" accept="image/*,application/pdf">
     <small id="cpinfo" style="display:block;margin-top:6px;color:var(--mut)"></small>
-    <div class="acts" id="cpacts" hidden style="margin-top:8px"><button type="button" id="cpver">Ver comprovante</button><button type="button" class="del" id="cprem">Remover</button></div>
+    <div class="acts" id="cpacts" hidden style="margin-top:8px"><button type="button" id="cpver"><span data-i="clip" data-s="16"></span> Ver comprovante</button><button type="button" class="del" id="cprem">Remover</button></div>
     <small id="ginfo" style="display:block;margin-top:12px;color:var(--mut)"></small>
     <div id="repbox"><label for="rep">Repetição</label><select id="rep"><option value="1">Só uma vez</option><option value="p">Parcelado</option><option value="m">Todo mês (fixo)</option></select>
       <div id="np" hidden><label for="npar">Número de parcelas</label><input id="npar" type="number" min="2" max="420" value="2"></div></div>
@@ -125,7 +174,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 </dialog>
 <dialog id="dc">
   <form id="fc">
-    <h2>Contas e saldos</h2>
+    <h2><span data-i="wallet" data-s="20"></span> Contas e saldos</h2>
     <div id="lc"></div>
     <label for="cnome">Nome da conta</label><input id="cnome" maxlength="40" required>
     <label for="csal">Saldo inicial (R$)</label><input id="csal" inputmode="decimal" placeholder="0,00">
@@ -133,31 +182,41 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
   </form>
 </dialog>
 <dialog id="dbk">
-  <h2>Backup e importação</h2>
+  <h2><span data-i="backup" data-s="20"></span> Backup e importação</h2>
   <p id="bkinfo" style="color:var(--mut);font-size:.9rem;margin:0 0 8px"></p>
   <div class="acts" style="flex-direction:column">
-    <button type="button" id="bexp">Baixar backup (JSON)</button>
-    <button type="button" id="bres">Restaurar backup (JSON)</button>
-    <button type="button" id="bcsv">Baixar lançamentos (CSV para Excel)</button>
-    <button type="button" id="bimp">Importar lançamentos (CSV)</button>
-    <button type="button" id="bmod">Baixar modelo de CSV</button>
+    <button type="button" id="bexp"><span data-i="download" data-s="16"></span> Baixar backup (JSON)</button>
+    <button type="button" id="bres"><span data-i="upload" data-s="16"></span> Restaurar backup (JSON)</button>
+    <button type="button" id="bcsv"><span data-i="download" data-s="16"></span> Baixar lançamentos (CSV para Excel)</button>
+    <button type="button" id="bimp"><span data-i="upload" data-s="16"></span> Importar lançamentos (CSV)</button>
+    <button type="button" id="bmod"><span data-i="file" data-s="16"></span> Baixar modelo de CSV</button>
     <button type="button" id="bkfechar">Fechar</button>
   </div>
   <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
 </dialog>
+<dialog id="dfl">
+  <h2><span data-i="sliders" data-s="20"></span> Filtros</h2>
+  <label for="fst">Situação</label><select id="fst"><option value="">Todas</option><option value="pago">Pagas ou recebidas</option><option value="pendente">Pendentes (a pagar ou a receber)</option></select>
+  <label for="fcat">Categoria</label><select id="fcat"></select>
+  <label for="fcn">Conta</label><select id="fcn"></select>
+  <label for="fpg">Forma de pagamento</label><select id="fpg"></select>
+  <label class="ck" style="margin-top:14px"><input type="checkbox" id="fcp"> Somente com comprovante</label>
+  <label class="ck" style="margin-top:8px"><input type="checkbox" id="ftd"> Buscar em todos os meses</label>
+  <div class="acts"><button type="button" id="flimpa">Limpar filtros</button><button type="button" class="ok" id="ffecha">Concluir</button></div>
+</dialog>
 <dialog id="dct" style="max-height:92vh;overflow:auto">
   <form id="fct">
-    <h2>Categorias</h2>
+    <h2><span data-i="tag" data-s="20"></span> Categorias</h2>
     <div class="seg3" role="group" aria-label="Tipo"><button type="button" data-k="saida">Saídas</button><button type="button" data-k="entrada">Entradas</button></div>
     <div id="lct"></div>
     <label for="cnm">Nome da categoria (toque em uma para renomear)</label><input id="cnm" maxlength="40" placeholder="Nova categoria" required>
     <div class="acts"><button type="button" id="ctfechar">Fechar</button><button type="button" class="del" id="ctexc" hidden>Excluir</button><button class="ok">Salvar</button></div>
-    <small style="display:block;margin-top:10px;color:var(--mut)">🔒 Categorias usadas automaticamente pelo app (faturas e metas) não podem ser renomeadas nem apagadas.</small>
+    <small style="display:block;margin-top:10px;color:var(--mut)"><span data-i="lock" data-s="13"></span> Categorias usadas automaticamente pelo app (faturas e metas) não podem ser renomeadas nem apagadas.</small>
   </form>
 </dialog>
 <dialog id="dmt" style="max-height:92vh;overflow:auto">
   <form id="fm">
-    <h2>Metas e reserva</h2>
+    <h2><span data-i="flag" data-s="20"></span> Metas e reserva</h2>
     <div id="lm"></div>
     <label for="mnome">Nome da meta</label><input id="mnome" maxlength="40" placeholder="Reserva de emergência" required>
     <label for="malvo">Valor da meta (R$)</label><input id="malvo" inputmode="decimal" placeholder="0,00" required>
@@ -173,7 +232,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 </dialog>
 <dialog id="dor">
   <form id="fo">
-    <h2>Orçamento mensal por categoria</h2>
+    <h2><span data-i="target" data-s="20"></span> Orçamento mensal por categoria</h2>
     <div id="lo"></div>
     <label for="ocat">Categoria</label><select id="ocat"></select>
     <label for="oval">Limite por mês (R$)</label><input id="oval" inputmode="decimal" placeholder="0,00" required>
@@ -181,13 +240,13 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
   </form>
 </dialog>
 <dialog id="dpn" style="max-height:92vh;overflow:auto">
-  <div class="nav"><button class="ic" id="pant" aria-label="Período anterior">‹</button><h2 id="ptit" style="margin:0;text-transform:capitalize"></h2><button class="ic" id="pprox" aria-label="Próximo período">›</button></div>
+  <div class="nav"><button class="ic" id="pant" aria-label="Período anterior">‹</button><h2 id="ptit" style="margin:0"></h2><button class="ic" id="pprox" aria-label="Próximo período">›</button></div>
   <div class="seg2" role="group" aria-label="Período"><button type="button" data-p="m">Mês</button><button type="button" data-p="a">Ano</button></div>
   <div id="pb"></div>
   <div class="acts"><button type="button" id="pfechar">Fechar</button></div>
 </dialog>
 <dialog id="dpf" style="max-height:94vh;overflow:auto">
-  <h2>Importar fatura (PDF)</h2>
+  <h2><span data-i="file" data-s="20"></span> Importar fatura (PDF)</h2>
   <label for="pfc">Cartão</label><select id="pfc"></select>
   <label for="pfm">Mês de vencimento da fatura</label><input id="pfm" type="month">
   <label for="pfa">Arquivo PDF da fatura</label><input id="pfa" type="file" accept="application/pdf">
@@ -199,10 +258,10 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 </dialog>
 <dialog id="dk">
   <form id="fk">
-    <h2>Cartões de crédito</h2>
+    <h2><span data-i="card" data-s="20"></span> Cartões de crédito</h2>
     <div id="lk"></div>
-    <button type="button" class="link" id="bpdf" style="margin:8px 0">Importar fatura (PDF)</button>
-    <button type="button" class="link" id="brecalc" style="margin:0 0 8px">Recalcular faturas</button>
+    <button type="button" class="link" id="bpdf" style="margin:8px 0;display:flex;align-items:center;justify-content:center;gap:6px"><span data-i="file" data-s="16"></span> Importar fatura (PDF)</button>
+    <button type="button" class="link" id="brecalc" style="margin:0 0 8px;display:flex;align-items:center;justify-content:center;gap:6px"><span data-i="refresh" data-s="16"></span> Recalcular faturas</button>
     <label for="knome">Nome do cartão</label><input id="knome" maxlength="40" required>
     <label for="kfech">Dia de fechamento</label><input id="kfech" type="number" min="1" max="31" required>
     <label for="kven">Dia de vencimento</label><input id="kven" type="number" min="1" max="31" required>
@@ -238,6 +297,59 @@ if (falha) { erro(falha); parou = true; throw new Error(falha); }
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
+const ICONS = {
+  chart: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+  tag: '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+  backup: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/>',
+  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/>',
+  upload: '<path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 20h16"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  sliders: '<path d="M4 6h9"/><path d="M17 6h3"/><path d="M4 12h3"/><path d="M11 12h9"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  chevL: '<path d="M15 18l-6-6 6-6"/>', chevR: '<path d="M9 18l6-6-6-6"/>', chevD: '<path d="M6 9l6 6 6-6"/>',
+  clip: '<path d="M21 12.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+  arrowDown: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>', arrowUp: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
+  refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  landmark: '<path d="M3 21h18"/><path d="M5 21V10M10 21V10M14 21V10M19 21V10"/><path d="M12 3l9 5H3z"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'
+};
+const ico = (n, s = 20) => '<svg class="i" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
+const iconizar = () => document.querySelectorAll('[data-i]').forEach(e => { if (!e.firstChild || e.firstChild.nodeType !== 1 || e.firstChild.tagName !== 'svg') e.insertAdjacentHTML('afterbegin', ico(e.dataset.i, +e.dataset.s || 18)); });
+
+// filtros da lista de lançamentos
+const flt = { q: '', tipo: '', st: '', cat: '', cn: '', pg: '', cp: false, todos: false };
+const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const nFiltros = () => ['st', 'cat', 'cn', 'pg'].filter(k => flt[k]).length + (flt.cp ? 1 : 0) + (flt.todos ? 1 : 0);
+function passa(l) {
+  if (flt.tipo && l.tipo !== flt.tipo) return false;
+  if (flt.st && (flt.st === 'pago') !== (l.status === 'pago')) return false;
+  if (flt.cat && (flt.cat === '-' ? !!l.categoria_id : l.categoria_id !== flt.cat)) return false;
+  if (flt.cn && l.conta_id !== flt.cn) return false;
+  if (flt.pg && (flt.pg === 'conta' ? (l.cartao_id || l.fatura_de) : (l.cartao_id !== flt.pg && l.fatura_de !== flt.pg))) return false;
+  if (flt.cp && !l.comprovante_path) return false;
+  if (flt.q) {
+    const h = norm([l.descricao, cats.find(c => c.id === l.categoria_id)?.nome, contas.find(c => c.id === l.conta_id)?.nome, cartoes.find(c => c.id === (l.cartao_id || l.fatura_de))?.nome,
+      (l.valor_centavos / 100).toFixed(2).replace('.', ','), fmt(l.valor_centavos), l.data].join(' '));
+    if (!norm(flt.q).split(/\s+/).filter(Boolean).every(w => h.includes(w))) return false;
+  }
+  return true;
+}
+function preencherFiltros() {
+  const mk = (sel, arr, v) => { sel.textContent = ''; for (const [val, n] of arr) { const o = document.createElement('option'); o.value = val; o.textContent = n; sel.append(o); } sel.value = v; };
+  mk($('#fcat'), [['', 'Todas'], ['-', 'Sem categoria'], ...cats.filter(c => c.tipo === 'saida').map(c => [c.id, c.nome + ' (saída)']), ...cats.filter(c => c.tipo === 'entrada').map(c => [c.id, c.nome + ' (entrada)'])], flt.cat);
+  mk($('#fcn'), [['', 'Todas'], ...contas.map(c => [c.id, c.nome])], flt.cn);
+  mk($('#fpg'), [['', 'Todas'], ['conta', 'Conta ou dinheiro'], ...cartoes.map(c => [c.id, 'Cartão ' + c.nome])], flt.pg);
+  $('#fst').value = flt.st; $('#fcp').checked = flt.cp; $('#ftd').checked = flt.todos;
+}
 const fmt = c => (c / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 const CAT_S = ['Moradia','Mercado','Restaurantes e delivery','Luz','Água','Gás','Internet','Celular e telefone','Transporte','Combustível','Saúde','Farmácia','Educação','Faturas','Dízimo e doações','Assinaturas','Vestuário','Lazer e entretenimento','Viagens','Beleza e cuidados pessoais','Pets','Filhos e família','Presentes','Casa e manutenção','Seguros','Impostos e taxas','Empréstimos e financiamentos','Tarifas bancárias','Investimentos e reserva','Compras diversas','Outros'];
 const CAT_E = ['Trabalho fixo','Renda extra','Bônus','13º salário','Férias','Pensão','Aposentadoria e benefícios','Vendas','Pró-labore','Aluguéis recebidos','Rendimentos de investimentos','Reembolsos','Restituição de impostos','Presentes recebidos','Outros'];
@@ -318,7 +430,7 @@ function render() {
   const TA = todas(), T = TA.filter(l => !l.cartao_id), ini = mes + '-01';
   const base = contas.reduce((s, c) => s + c.saldo_inicial_centavos, 0);
   const ant = base + val(T, l => l.status === 'pago' && l.data < ini);
-  const M = T.filter(l => l.data.startsWith(mes)), ML = TA.filter(l => l.data.startsWith(mes)).sort((a, b) => b.data.localeCompare(a.data));
+  const M = T.filter(l => l.data.startsWith(mes)), ML = (flt.todos ? TA : TA.filter(l => l.data.startsWith(mes))).filter(passa).sort((a, b) => b.data.localeCompare(a.data));
   const e = soma(M, l => l.tipo === 'entrada'), s = soma(M, l => l.tipo === 'saida');
   const ar = soma(M, l => l.tipo === 'entrada' && l.status !== 'pago'), ap = soma(M, l => l.tipo === 'saida' && l.status !== 'pago');
   const real = ant + val(M, l => l.status === 'pago'), prev = real + ar - ap;
@@ -339,22 +451,26 @@ function render() {
   const pc = bs ? Math.round(fv / bs * 100) : null;
   fl.hidden = !fv;
   if (fv) fl.textContent = 'Faturas do mês: ' + fmt(fv) + (pc === null ? ' · lance suas entradas para ver o percentual' : ' (' + pc + '% ' + ori + ') · ' + (pc <= 30 ? 'saudável' : pc <= 60 ? 'atenção' : pc < 80 ? 'alto' : 'crítico'));
+  document.querySelectorAll('.chips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.ft === flt.tipo));
+  const nf = nFiltros(), em = $('#fcount'); em.hidden = !nf; em.textContent = nf;
+  const filtrando = !!(flt.q || flt.tipo || nf), fi = $('#finfo'); fi.hidden = !filtrando;
+  if (filtrando) fi.textContent = ML.length + (ML.length === 1 ? ' lançamento' : ' lançamentos') + (flt.todos ? ' em todos os meses' : ' neste mês') + ' com os filtros atuais' + (ML.length > 300 ? ' (mostrando os 300 mais recentes)' : '') + '.';
   const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
   const box = $('#lista'); box.textContent = '';
-  if (!ML.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
-  for (const l of ML) {
+  if (!ML.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = filtrando ? 'Nenhum lançamento encontrado com esses filtros.' : 'Nenhum lançamento neste mês. Toque em + para registrar o primeiro.'; box.append(d); return; }
+  for (const l of ML.slice(0, 300)) {
     const pg = l.status === 'pago', ent = l.tipo === 'entrada';
     const r = document.createElement('div'); r.className = 'row' + (pg ? '' : ' pend');
     const c = document.createElement('button'); c.className = 'chk'; c.setAttribute('aria-pressed', pg);
     c.setAttribute('aria-label', pg ? 'Marcar como pendente' : (ent ? 'Marcar como recebido' : 'Marcar como pago'));
-    c.innerHTML = '<i>' + (pg ? '✓' : '') + '</i>'; c.onclick = () => mudarStatus(l);
-    if (l.cartao_id) { c.disabled = true; c.removeAttribute('aria-pressed'); c.setAttribute('aria-label', 'Compra no cartão'); c.innerHTML = '<i style="border:0">💳</i>'; }
+    c.innerHTML = '<i>' + (pg ? ico('check', 14) : '') + '</i>'; c.onclick = () => mudarStatus(l);
+    if (l.cartao_id) { c.disabled = true; c.removeAttribute('aria-pressed'); c.setAttribute('aria-label', 'Compra no cartão'); c.innerHTML = '<i style="border:0;color:var(--mut)">' + ico('card', 20) + '</i>'; }
     const m = document.createElement('button'); m.className = 'main';
     const t = document.createElement('div'); t.className = 't';
     const b1 = document.createElement('b'); b1.textContent = (l.descricao || nome(l.categoria_id)) + (l.parcela_total ? ' (' + l.parcela_n + '/' + l.parcela_total + ')' : '');
     const sp = document.createElement('span');
-    sp.textContent = l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.cartao_id ? ' · ' + (cartoes.find(k => k.id === l.cartao_id)?.nome || 'cartão') : '') + (l.comprovante_path ? ' · 📎' : '') + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
-    t.append(b1, sp);
+    sp.textContent = (flt.todos ? l.data.split('-').reverse().join('/') : l.data.split('-').reverse().slice(0, 2).join('/')) + ' · ' + nome(l.categoria_id) + (pg ? '' : (ent ? ' · a receber' : ' · a pagar')) + (l.cartao_id ? ' · ' + (cartoes.find(k => k.id === l.cartao_id)?.nome || 'cartão') : '') + (l.recorrente ? ' · fixo' : '') + (l._p ? ' · aguardando envio' : '');
+    t.append(b1, sp); if (l.comprovante_path) sp.insertAdjacentHTML('beforeend', ' · ' + ico('clip', 13));
     const v = document.createElement('div'); v.className = 'num ' + (ent ? 'in' : 'out');
     v.textContent = (ent ? '+ ' : '− ') + fmt(l.valor_centavos);
     m.append(t, v); m.onclick = () => l.fatura_de ? toast('Fatura calculada pelas compras do cartão. Marque como paga na bolinha.') : abrir(l); r.append(c, m); box.append(r);
@@ -781,7 +897,7 @@ function listarCat() {
   for (const c of cats.filter(c => c.tipo === ctTipo)) {
     const n = lans.filter(l => l.categoria_id === c.id).length;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cl';
-    const a = document.createElement('span'); a.textContent = c.nome + (protegida(c) ? ' 🔒' : '');
+    const a = document.createElement('span'); a.textContent = c.nome; if (protegida(c)) a.insertAdjacentHTML('beforeend', ' ' + ico('lock', 13));
     const v = document.createElement('small'); v.style.color = 'var(--mut)'; v.textContent = n + (n === 1 ? ' lançamento' : ' lançamentos'); b.append(a, v);
     b.onclick = () => editarCat(c); box.append(b);
   }
@@ -856,7 +972,7 @@ function lemb() {
   const R = lembretes(), box = $('#lemb'); box.hidden = !R.length; if (!R.length) return;
   const at = R.filter(x => x.d < 0).length, hj = R.filter(x => x.d === 0).length, pr = R.filter(x => x.d > 0).length;
   const aberto = lembAberto ?? (at + hj > 0);
-  $('#lembt').textContent = (aberto ? '▾ ' : '▸ ') + 'Vencimentos: ' + [at && at + ' em atraso', hj && hj + ' para hoje', pr && pr + ' nos próximos dias'].filter(Boolean).join(' · ');
+  $('#lembt').innerHTML = ico('clock', 16) + ' ' + ico(aberto ? 'chevD' : 'chevR', 14) + ' Vencimentos: ' + [at && at + ' em atraso', hj && hj + ' para hoje', pr && pr + ' nos próximos dias'].filter(Boolean).join(' · ');
   $('#lembt').style.color = at + hj ? 'var(--out)' : 'var(--warn)';
   const lst = $('#lembl'); lst.textContent = ''; lst.hidden = !aberto;
   const nome = id => cats.find(c => c.id === id)?.nome || 'Sem categoria';
@@ -1213,6 +1329,17 @@ $('#pfc').onchange = pfParse;
 $('#pfv').onclick = () => { pfVer = !pfVer; pfResumo(); };
 $('#pfx').onclick = () => $('#dpf').close();
 $('#pfok').onclick = pfImportar;
+$('#fq').oninput = e => { flt.q = e.target.value; render(); };
+document.querySelectorAll('.chips button').forEach(b => b.onclick = () => { flt.tipo = b.dataset.ft; render(); });
+$('#fbtn').onclick = () => { preencherFiltros(); $('#dfl').showModal(); };
+$('#fst').onchange = () => { flt.st = $('#fst').value; render(); };
+$('#fcat').onchange = () => { flt.cat = $('#fcat').value; render(); };
+$('#fcn').onchange = () => { flt.cn = $('#fcn').value; render(); };
+$('#fpg').onchange = () => { flt.pg = $('#fpg').value; render(); };
+$('#fcp').onchange = () => { flt.cp = $('#fcp').checked; render(); };
+$('#ftd').onchange = () => { flt.todos = $('#ftd').checked; render(); };
+$('#flimpa').onclick = () => { Object.assign(flt, { q: '', tipo: '', st: '', cat: '', cn: '', pg: '', cp: false, todos: false }); $('#fq').value = ''; preencherFiltros(); render(); };
+$('#ffecha').onclick = () => $('#dfl').close();
 $('#bcat2').onclick = () => { ctTipo = 'saida'; editarCat(null); listarCat(); $('#dct').showModal(); };
 $('#ctfechar').onclick = () => $('#dct').close();
 $('#ctexc').onclick = excluirCat;
@@ -1250,6 +1377,7 @@ document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTipo(
 $('#rep').onchange = () => { pcmudou(); const p = $('#rep').value === 'p'; $('#np').hidden = !p; $('#lv').textContent = p ? 'Valor de cada parcela (R$)' : 'Valor (R$)'; };
 window.addEventListener('online', async () => { await flush(); loadLans(); });
 
+iconizar();
 (async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   const { data: { session } } = await sb.auth.getSession();
