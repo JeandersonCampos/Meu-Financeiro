@@ -88,6 +88,9 @@ dialog h2{display:flex;align-items:center;gap:8px}
 .ck input{width:20px;height:20px;flex:none}
 .esq{display:block;margin:14px auto 0;border:0;background:none;color:var(--pri);text-decoration:underline;font-size:.9rem}
 #login .rodape{margin:34px 0 0;text-align:center;color:var(--mut);font-size:.8rem}
+:root{--warnbg:#8a5a00;--onwarn:#fff}
+@media(prefers-color-scheme:dark){:root{--warnbg:#e0b44c;--onwarn:#1b1b1b}}
+.offb{display:block;width:100%;margin:0 0 8px;padding:9px 12px;border:0;border-radius:10px;background:var(--warnbg);color:var(--onwarn);font-size:.85rem;text-align:left}
 </style>
 </head>
 <body>
@@ -102,11 +105,12 @@ dialog h2{display:flex;align-items:center;gap:8px}
     <button type="button" class="esq" id="esq">Esqueci minha senha</button>
     <div id="msg" role="alert"></div>
   </form>
-  <p class="rodape">Desenvolvido por Jcampos · versão 22</p>
+  <p class="rodape">Desenvolvido por Jcampos · versão 23</p>
 </section>
 
 <main id="app" hidden>
   <div class="topo"><img src="logo.svg" alt=""><b>Meu Financeiro</b></div>
+  <button id="offb" type="button" class="offb" hidden></button>
   <div class="nav">
     <button class="ic" id="ant" aria-label="Mês anterior"><span data-i="chevL" data-s="22"></span></button>
     <h1 id="mesn"></h1>
@@ -311,7 +315,11 @@ const falha = typeof supabase === 'undefined'
 if (falha) { erro(falha); parou = true; throw new Error(falha); }
 
 const RECUP = /type=recovery/.test(location.hash);
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const fetchT = (u, o = {}) => {
+  const c = new AbortController(), ms = String(u).includes('/storage/v1/') ? 60000 : 12000, t = setTimeout(() => c.abort(), ms);
+  return fetch(u, { ...o, signal: o.signal || c.signal }).finally(() => clearTimeout(t));
+};
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: fetchT } });
 sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') setTimeout(() => abrirSenha(true), 0); });
 const $ = s => document.querySelector(s);
 const ICONS = {
@@ -379,9 +387,40 @@ let uid, cats = [], metas = [], medit = null, orcs = [], oedit = null, cartoes =
 
 const key = k => 'cf_' + uid + '_' + k;
 const lerLS = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
+const guardaLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* armazenamento cheio: segue sem guardar a cópia */ } };
+// erro de conexão (sem internet, sinal fraco ou tempo esgotado) e erro de sessão vencida
+const ehRede = e => !navigator.onLine || /failed to fetch|networkerror|network request failed|load failed|fetch failed|timeout|abort/i.test(String(e?.message || e));
+const ehAuth = e => /jwt|not authenticated|unauthorized|invalid claim/i.test(String(e?.message || '')) || e?.status === 401;
+// fila de lançamentos novos ou alterados, fila de exclusões e fila de cadastros (contas, cartões, categorias, metas, orçamentos)
 const pend = () => lerLS(key('pend'), []);
-const setPend = p => localStorage.setItem(key('pend'), JSON.stringify(p));
-const queue = row => setPend([...pend().filter(p => p.id !== row.id), row]);
+const setPend = p => { guardaLS(key('pend'), JSON.stringify(p)); atualizaOff(); };
+const queue = row => { const antigo = pend().find(p => p.id === row.id); setPend([...pend().filter(p => p.id !== row.id), { ...antigo, ...row }]); };
+const pendDel = () => lerLS(key('del'), []);
+const setPendDel = d => { guardaLS(key('del'), JSON.stringify(d)); atualizaOff(); };
+const ops = () => lerLS(key('ops'), []);
+const setOps = o => { guardaLS(key('ops'), JSON.stringify(o)); atualizaOff(); };
+const pendentes = () => pend().length + pendDel().length + ops().length;
+// aplica as operações de cadastro que ainda não foram enviadas sobre a lista vinda do servidor ou da cópia local
+function sobre(t, arr) {
+  let r = arr.slice();
+  for (const x of ops()) {
+    if (x.t !== t) continue;
+    if (x.tipo === 'delete') r = r.filter(y => y.id !== x.dado);
+    else { const i = r.findIndex(y => y.id === x.dado.id); if (i >= 0) r[i] = { ...r[i], ...x.dado }; else r.push(x.dado); }
+  }
+  if (['categorias', 'contas', 'cartoes'].includes(t)) r.sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  return r;
+}
+// grava no servidor; sem conexão, guarda para enviar depois
+async function gravaTab(t, tipo, dado) {
+  if (navigator.onLine) {
+    const { error } = tipo === 'delete' ? await sb.from(t).delete().eq('id', dado) : await sb.from(t).upsert(dado);
+    if (!error) return { ok: true };
+    if (!ehRede(error)) return { ok: false, error };
+  }
+  setOps([...ops(), { t, tipo, dado }]);
+  return { ok: true, offline: true };
+}
 function toast(t) { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => e.style.display = 'none', 3500); }
 function parseValor(s) { const n = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return n > 0 ? Math.round(n * 100) : 0; }
 const parseSaldo = s => Math.round((parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0) * 100);
@@ -391,35 +430,35 @@ const val = (arr, f) => arr.filter(f).reduce((s, l) => s + liq(l), 0);
 
 async function loadCats(semear = true) {
   const { data, error } = await sb.from('categorias').select('*').order('nome');
-  if (error) { cats = lerLS(key('cats'), []); return; }
+  if (error) { cats = sobre('categorias', lerLS(key('cats'), [])); return; }
   // cria as categorias padrão só na primeira vez (conta sem nenhuma categoria)
   const falta = !semear || data.length ? [] : [...CAT_S.map(nome => ({ nome, tipo: 'saida' })), ...CAT_E.map(nome => ({ nome, tipo: 'entrada' }))];
   if (falta.length) { await sb.from('categorias').insert(falta); return loadCats(false); }
-  cats = data; localStorage.setItem(key('cats'), JSON.stringify(data));
+  cats = sobre('categorias', data); guardaLS(key('cats'), JSON.stringify(data));
 }
 
 async function loadContas() {
   const { data, error } = await sb.from('contas').select('*').order('nome');
-  if (error) { contas = lerLS(key('contas'), []); return; }
-  contas = data; localStorage.setItem(key('contas'), JSON.stringify(data));
+  if (error) { contas = sobre('contas', lerLS(key('contas'), [])); return; }
+  contas = sobre('contas', data); guardaLS(key('contas'), JSON.stringify(data));
 }
 
 async function loadMetas() {
   const { data, error } = await sb.from('metas').select('*').order('created_at');
-  if (error) { metas = lerLS(key('metas'), []); if (/relation|metas/.test(error.message)) erro('rode o arquivo migracao-etapa7b.sql no SQL Editor do Supabase.'); return; }
-  metas = data; localStorage.setItem(key('metas'), JSON.stringify(data));
+  if (error) { metas = sobre('metas', lerLS(key('metas'), [])); if (/relation|metas/.test(error.message)) erro('rode o arquivo migracao-etapa7b.sql no SQL Editor do Supabase.'); return; }
+  metas = sobre('metas', data); guardaLS(key('metas'), JSON.stringify(data));
 }
 
 async function loadOrcs() {
   const { data, error } = await sb.from('orcamentos').select('*');
-  if (error) { orcs = lerLS(key('orcs'), []); if (/relation|orcamentos/.test(error.message)) erro('rode o arquivo migracao-etapa7a.sql no SQL Editor do Supabase.'); return; }
-  orcs = data; localStorage.setItem(key('orcs'), JSON.stringify(data));
+  if (error) { orcs = sobre('orcamentos', lerLS(key('orcs'), [])); if (/relation|orcamentos/.test(error.message)) erro('rode o arquivo migracao-etapa7a.sql no SQL Editor do Supabase.'); return; }
+  orcs = sobre('orcamentos', data); guardaLS(key('orcs'), JSON.stringify(data));
 }
 
 async function loadCartoes() {
   const { data, error } = await sb.from('cartoes').select('*').order('nome');
-  if (error) { cartoes = lerLS(key('cartoes'), []); if (/relation|cartoes/.test(error.message)) erro('rode o arquivo migracao-etapa4.sql no SQL Editor do Supabase.'); return; }
-  cartoes = data; localStorage.setItem(key('cartoes'), JSON.stringify(data));
+  if (error) { cartoes = sobre('cartoes', lerLS(key('cartoes'), [])); if (/relation|cartoes/.test(error.message)) erro('rode o arquivo migracao-etapa4.sql no SQL Editor do Supabase.'); return; }
+  cartoes = sobre('cartoes', data); guardaLS(key('cartoes'), JSON.stringify(data));
 }
 
 async function loadLans() {
@@ -430,21 +469,90 @@ async function loadLans() {
     if (error) { falhou = true; if (/status|conta_id/.test(error.message)) erro('rode o arquivo migracao-etapa2.sql no SQL Editor do Supabase.'); break; }
     all = all.concat(data); if (data.length < 1000) break; de += 1000;
   }
-  if (falhou) lans = lerLS(key('all'), []); else { lans = all; localStorage.setItem(key('all'), JSON.stringify(all)); }
+  if (falhou) lans = lerLS(key('all'), []); else { lans = all; guardaLS(key('all'), JSON.stringify(all)); }
   render(); if ($('#dpn').open) painel(); if ($('#dmt').open) listarMetas();
   if (!falhou) sincronizarFaturas();
 }
 
-async function flush() {
-  const p = pend();
-  if (!p.length || !navigator.onLine) return;
-  const { error } = await sb.from('lancamentos').upsert(p);
-  if (!error) { setPend([]); toast('Lançamentos salvos offline foram enviados'); }
+let enviando = false;
+async function flush(manual = false) {
+  if (enviando || !navigator.onLine) return 0;
+  if (!pendentes()) { if (manual) toast('Tudo já está sincronizado.'); return 0; }
+  enviando = true;
+  let enviados = 0, problema = null;
+  const parar = () => problema && (ehRede(problema) || ehAuth(problema));
+  try {
+    // 1) cadastros (contas, cartões, categorias, metas, orçamentos)
+    let o = ops();
+    while (o.length) {
+      const x = o[0], { error } = x.tipo === 'delete' ? await sb.from(x.t).delete().eq('id', x.dado) : await sb.from(x.t).upsert(x.dado);
+      if (error && (ehRede(error) || ehAuth(error))) { problema = error; break; }
+      if (error) problema = problema || error; else enviados++;
+      o = o.slice(1); setOps(o);
+    }
+    // 2) lançamentos novos ou alterados (agrupados por colunas iguais, para não apagar dados sem querer)
+    if (!parar()) {
+      const grupos = {};
+      for (const r of pend()) (grupos[Object.keys(r).sort().join()] ??= []).push(r);
+      for (const g of Object.values(grupos)) {
+        for (let i = 0; i < g.length && !parar(); i += 200) {
+          const lote = g.slice(i, i + 200), { error } = await sb.from('lancamentos').upsert(lote);
+          if (!error) { setPend(pend().filter(x => !lote.some(y => y.id === x.id))); enviados += lote.length; continue; }
+          if (ehRede(error) || ehAuth(error)) { problema = error; break; }
+          for (const r of lote) { // erro do servidor: tenta uma a uma para achar a linha com problema
+            const e1 = (await sb.from('lancamentos').upsert(r)).error;
+            if (!e1) { setPend(pend().filter(x => x.id !== r.id)); enviados++; } else problema = problema || e1;
+          }
+        }
+        if (parar()) break;
+      }
+    }
+    // 3) exclusões
+    if (!parar()) {
+      for (;;) {
+        const lote = pendDel().slice(0, 100); if (!lote.length) break;
+        const { error } = await sb.from('lancamentos').delete().in('id', lote.map(x => x.id));
+        if (error) { problema = problema || error; break; }
+        setPendDel(pendDel().filter(x => !lote.some(y => y.id === x.id))); enviados += lote.length;
+        const cam = lote.map(x => x.path).filter(Boolean); if (cam.length) sb.storage.from('comprovantes').remove(cam);
+      }
+    }
+  } finally { enviando = false; atualizaOff(); }
+  if (problema && ehAuth(problema)) { toast('Sua sessão expirou. Entre de novo para enviar as alterações pendentes.'); sair(); }
+  else if (problema && !ehRede(problema)) toast('Algumas alterações não foram aceitas pelo servidor: ' + problema.message);
+  else if (enviados && !problema) toast('Alterações enviadas.');
+  return enviados;
+}
+async function recarregar() {
+  await Promise.all([loadCats(false), loadContas(), loadCartoes(), loadOrcs(), loadMetas()]);
+  await loadLans(); gerarFixos();
+}
+async function sincronizar(forcar = false, manual = false) {
+  if (!uid) return;
+  const n = await flush(manual);
+  if (n || forcar) await recarregar();
+}
+// mostra o que está na tela instantaneamente, com os dados guardados no aparelho
+function doCache() {
+  cats = sobre('categorias', lerLS(key('cats'), [])); contas = sobre('contas', lerLS(key('contas'), [])); cartoes = sobre('cartoes', lerLS(key('cartoes'), []));
+  orcs = sobre('orcamentos', lerLS(key('orcs'), [])); metas = sobre('metas', lerLS(key('metas'), [])); lans = lerLS(key('all'), []);
+  render();
+}
+function atualizaOff() {
+  const b = $('#offb'); if (!b) return;
+  const n = pendentes(), off = !navigator.onLine, t = n + (n === 1 ? ' alteração aguardando envio' : ' alterações aguardando envio');
+  b.hidden = !(off || n);
+  b.textContent = off ? 'Sem internet · ' + (n ? t : 'o app continua funcionando') : t + ' · toque para enviar agora';
 }
 
-const todas = () => { const ids = new Set(pend().map(p => p.id)); return [...pend().map(p => ({ ...p, _p: 1 })), ...lans.filter(l => !ids.has(l.id))]; };
+const noServidor = id => lans.some(l => l.id === id);
+const todas = () => {
+  const ids = new Set(pend().map(p => p.id)), apagar = new Set(pendDel().map(d => d.id)), srv = new Map(lans.map(l => [l.id, l]));
+  return [...pend().filter(p => !apagar.has(p.id)).map(p => ({ ...(srv.get(p.id) || {}), ...p, _p: 1 })), ...lans.filter(l => !ids.has(l.id) && !apagar.has(l.id))];
+};
 
 function render() {
+  atualizaOff();
   const TA = todas(), T = TA.filter(l => !l.cartao_id), ini = mes + '-01';
   const base = contas.reduce((s, c) => s + c.saldo_inicial_centavos, 0);
   const ant = base + val(T, l => l.status === 'pago' && l.data < ini);
@@ -496,12 +604,12 @@ function render() {
 }
 
 async function mudarStatus(l) {
-  const row = { ...l, status: l.status === 'pago' ? 'pendente' : 'pago' }; delete row._p;
-  if (l._p) queue(row);
-  else {
-    const { error } = await sb.from('lancamentos').update({ status: row.status }).eq('id', l.id);
-    if (error) return toast('Não foi possível alterar agora. Verifique a conexão.');
-  }
+  const status = l.status === 'pago' ? 'pendente' : 'pago';
+  if (!l._p && navigator.onLine) {
+    const { error } = await sb.from('lancamentos').update({ status }).eq('id', l.id);
+    if (error && !ehRede(error)) return toast('Não foi possível alterar agora: ' + error.message);
+    if (error) queue({ id: l.id, status });
+  } else queue({ id: l.id, status });
   loadLans();
 }
 
@@ -567,15 +675,18 @@ async function salvar(ev) {
   } else if (cpRemover && editing) row.comprovante_path = null;
   if (editing) {
     Object.assign(row, { grupo_id: editing.grupo_id ?? null, parcela_n: editing.parcela_n ?? null, parcela_total: editing.parcela_total ?? null, recorrente: !!editing.recorrente });
-    if (editing._p) queue(row);
+    if (editing._p || !navigator.onLine) { queue(row); if (!navigator.onLine) toast('Sem conexão: alteração salva no aparelho e enviada quando voltar.'); }
     else {
       const { error } = await sb.from('lancamentos').update(row).eq('id', row.id);
-      if (error) return toast('Não foi possível salvar agora. Verifique a conexão e tente de novo.');
+      if (error && !ehRede(error)) return toast('Não foi possível salvar agora: ' + error.message);
+      if (error) { queue(row); toast('Sem conexão: alteração salva no aparelho e enviada quando voltar.'); }
+      else {
       const mudou = ['valor_centavos', 'categoria_id', 'conta_id', 'descricao'].some(c => (editing[c] ?? null) !== row[c]);
       if (row.grupo_id && mudou && confirm('Aplicar valor, categoria, conta e descrição também às próximas?\nOK = esta e as próximas. Cancelar = só esta.')) {
         const { error: e2 } = await sb.from('lancamentos').update({ valor_centavos: v, categoria_id: row.categoria_id, conta_id: row.conta_id, descricao: row.descricao })
           .eq('grupo_id', row.grupo_id).gt('data', row.data);
         if (e2) toast('Esta foi salva, mas não deu para atualizar as próximas.');
+      }
       }
     }
   } else {
@@ -583,22 +694,33 @@ async function salvar(ev) {
     const rows = Array.from({ length: n }, (_, i) => ({ ...row, id: i ? crypto.randomUUID() : row.id, data: dataMais(row.data, i), status: i ? 'pendente' : row.status,
       comprovante_path: i ? null : (row.comprovante_path ?? null), grupo_id: g, parcela_n: r === 'p' ? i + 1 : null, parcela_total: r === 'p' ? n : null, recorrente: r === 'm' }));
     const { error } = navigator.onLine ? await sb.from('lancamentos').upsert(rows) : { error: 1 };
+    if (error && !ehRede(error)) return toast('Não foi possível salvar: ' + error.message);
     if (error) { rows.forEach(x => queue(x)); toast('Sem conexão: salvo no aparelho e enviado quando voltar.'); }
   }
   if (antigo && row.comprovante_path !== undefined && row.comprovante_path !== antigo) sb.storage.from('comprovantes').remove([antigo]);
   $('#dlg').close(); loadLans();
+  if (navigator.onLine && pendentes()) sincronizar();
 }
 
 async function excluir() {
   if (!editing || !confirm('Excluir este lançamento?')) return;
-  if (editing._p) setPend(pend().filter(p => p.id !== editing.id));
-  else {
-    const g = editing.grupo_id, tudo = g && confirm('Excluir também as próximas parcelas ou ocorrências?\nOK = esta e as próximas. Cancelar = só esta.');
+  const g = editing.grupo_id, tudo = !!g && confirm('Excluir também as próximas parcelas ou ocorrências?\nOK = esta e as próximas. Cancelar = só esta.');
+  const alvo = tudo ? todas().filter(l => l.grupo_id === g && l.data >= editing.data) : [editing];
+  const ids = alvo.map(l => l.id), srv = ids.filter(noServidor);
+  let offline = !navigator.onLine;
+  if (srv.length && !offline) {
     const { error } = await (tudo ? sb.from('lancamentos').delete().eq('grupo_id', g).gte('data', editing.data) : sb.from('lancamentos').delete().eq('id', editing.id));
-    if (error) return toast('Não foi possível excluir agora. Verifique a conexão.');
-    if (tudo && editing.recorrente) await sb.from('lancamentos').update({ recorrente: false }).eq('grupo_id', g);
-    const cam = (tudo ? lans.filter(l => l.grupo_id === g && l.data >= editing.data) : [editing]).map(l => l.comprovante_path).filter(Boolean);
-    if (cam.length) sb.storage.from('comprovantes').remove(cam);
+    if (error) { if (!ehRede(error)) return toast('Não foi possível excluir agora: ' + error.message); offline = true; }
+    else {
+      if (tudo && editing.recorrente) await sb.from('lancamentos').update({ recorrente: false }).eq('grupo_id', g);
+      const cam = alvo.map(l => l.comprovante_path).filter(Boolean); if (cam.length) sb.storage.from('comprovantes').remove(cam);
+    }
+  }
+  setPend(pend().filter(p => !ids.includes(p.id)));
+  if (offline && srv.length) {
+    setPendDel([...pendDel(), ...srv.map(id => ({ id, path: lans.find(l => l.id === id)?.comprovante_path || null }))]);
+    if (tudo && editing.recorrente) lans.filter(l => l.grupo_id === g && l.data < editing.data).forEach(l => queue({ id: l.id, recorrente: false }));
+    toast('Sem conexão: exclusão guardada e enviada quando voltar.');
   }
   $('#dlg').close(); loadLans();
 }
@@ -641,6 +763,7 @@ async function baixarTudo(n) {
   }
 }
 async function lerTudo() {
+  if (!navigator.onLine) return { categorias: cats, contas, cartoes, metas, orcamentos: orcs, lancamentos: todas().map(({ _p, ...r }) => r) };
   const t = {};
   for (const n of ['categorias', 'contas', 'cartoes', 'metas', 'orcamentos', 'lancamentos']) { t[n] = await baixarTudo(n); if (!t[n]) { toast('Não foi possível ler os dados. Verifique a conexão.'); return null; } }
   return t;
@@ -648,9 +771,10 @@ async function lerTudo() {
 async function exportarJson() {
   const t = await lerTudo(); if (!t) return;
   baixar('financeiro-backup-' + hoje() + '.json', JSON.stringify({ versao: 1, em: new Date().toISOString(), ...t }), 'application/json');
-  localStorage.setItem('cf_ult_backup', hoje()); infoBackup(); toast('Backup baixado.');
+  guardaLS('cf_ult_backup', hoje()); infoBackup(); toast('Backup baixado.');
 }
 async function restaurarJson(file) {
+  if (!navigator.onLine) return toast('Restaurar um backup exige internet.');
   let d; try { d = JSON.parse(await file.text()); } catch { return toast('Arquivo inválido.'); }
   if (!Array.isArray(d.lancamentos)) return toast('Este arquivo não parece ser um backup do app.');
   if (!confirm('Restaurar ' + d.lancamentos.length + ' lançamentos? Itens com o mesmo código são atualizados e nada é apagado.')) return;
@@ -689,6 +813,7 @@ async function importarCsv(file) {
   });
   if (!rows.length) return toast('Nenhuma linha válida. Use o modelo de CSV.');
   if (!confirm('Importar ' + rows.length + ' lançamentos' + (ign.length ? ' (' + ign.length + ' linhas ignoradas: ' + ign.slice(0, 8).join(', ') + ')' : '') + '?')) return;
+  if (!navigator.onLine) { rows.forEach(r => queue(r)); await loadLans(); return toast('Sem conexão: ' + rows.length + ' lançamentos salvos no aparelho e enviados quando voltar.'); }
   for (let i = 0; i < rows.length; i += 200) {
     const { error } = await sb.from('lancamentos').insert(rows.slice(i, i + 200));
     if (error) return toast('Falha ao importar: ' + error.message);
@@ -927,13 +1052,15 @@ async function salvarCat(ev) {
   const t = ctEdit ? ctEdit.tipo : ctTipo;
   if (ctEdit && protegida(ctEdit)) return toast('Esta categoria é usada automaticamente pelo app e não pode ser renomeada.');
   if (cats.some(c => c.tipo === t && c.id !== ctEdit?.id && c.nome.toLowerCase() === nome.toLowerCase())) return toast('Já existe uma categoria com esse nome.');
-  const { error } = await sb.from('categorias').upsert({ id: ctEdit?.id || crypto.randomUUID(), nome, tipo: t });
-  if (error) return toast('Não foi possível salvar agora. Verifique a conexão.');
+  const r = await gravaTab('categorias', 'upsert', { id: ctEdit?.id || crypto.randomUUID(), nome, tipo: t });
+  if (!r.ok) return toast('Não foi possível salvar agora: ' + r.error.message);
+  if (r.offline) toast('Sem conexão: salvo no aparelho e enviado quando voltar.');
   await loadCats(false); editarCat(null); listarCat(); render();
 }
 async function excluirCat() {
   if (!ctEdit) return;
   if (protegida(ctEdit)) return toast('Esta categoria é usada automaticamente pelo app e não pode ser apagada.');
+  if (!navigator.onLine) return toast('Para excluir uma categoria é preciso estar com internet.');
   const n = lans.filter(l => l.categoria_id === ctEdit.id).length, o = orcs.some(x => x.categoria_id === ctEdit.id);
   if (!confirm('Excluir "' + ctEdit.nome + '"?' + (n ? '\n' + n + ' lançamento(s) ficarão sem categoria.' : '') + (o ? '\nO orçamento dessa categoria também será removido.' : ''))) return;
   const { error } = await sb.from('categorias').delete().eq('id', ctEdit.id);
@@ -1040,12 +1167,15 @@ async function salvarMeta(ev) {
   ev.preventDefault();
   const v = parseValor($('#malvo').value); if (!v) return toast('Informe um valor de meta maior que zero.');
   const row = { id: medit?.id || crypto.randomUUID(), nome: $('#mnome').value.trim(), alvo_centavos: v, prazo: $('#mprazo').value ? $('#mprazo').value + '-01' : null };
-  const { error } = await sb.from('metas').upsert(row);
-  if (error) return toast('Não foi possível salvar a meta agora. Verifique a conexão.');
+  const r = await gravaTab('metas', 'upsert', row);
+  if (!r.ok) return toast('Não foi possível salvar a meta agora: ' + r.error.message);
+  if (r.offline) toast('Sem conexão: salva no aparelho e enviada quando voltar.');
   await loadMetas(); editarMeta(null); listarMetas();
 }
 async function excluirMeta() {
-  if (!medit || !confirm('Excluir a meta "' + medit.nome + '"? Os valores já guardados continuam como lançamentos.')) return;
+  if (!medit) return;
+  if (!navigator.onLine) return toast('Para excluir uma meta é preciso estar com internet.');
+  if (!confirm('Excluir a meta "' + medit.nome + '"? Os valores já guardados continuam como lançamentos.')) return;
   const { error } = await sb.from('metas').delete().eq('id', medit.id);
   if (error) return toast('Não foi possível excluir agora.');
   await loadMetas(); await loadLans(); editarMeta(null); listarMetas();
@@ -1089,14 +1219,15 @@ async function salvarOrc(ev) {
   ev.preventDefault();
   const v = parseValor($('#oval').value); if (!v) return toast('Informe um limite maior que zero.');
   const cat = oedit ? oedit.categoria_id : $('#ocat').value, ex = orcs.find(o => o.categoria_id === cat);
-  const { error } = await sb.from('orcamentos').upsert({ id: ex?.id || crypto.randomUUID(), categoria_id: cat, valor_centavos: v });
-  if (error) return toast('Não foi possível salvar o orçamento agora. Verifique a conexão.');
+  const r = await gravaTab('orcamentos', 'upsert', { id: ex?.id || crypto.randomUUID(), categoria_id: cat, valor_centavos: v });
+  if (!r.ok) return toast('Não foi possível salvar o orçamento agora: ' + r.error.message);
+  if (r.offline) toast('Sem conexão: salvo no aparelho e enviado quando voltar.');
   await loadOrcs(); editarOrc(null); listarOrc(); render(); if ($('#dpn').open) painel();
 }
 async function removerOrc() {
   if (!oedit || !confirm('Remover o orçamento desta categoria?')) return;
-  const { error } = await sb.from('orcamentos').delete().eq('id', oedit.id);
-  if (error) return toast('Não foi possível remover agora.');
+  const r = await gravaTab('orcamentos', 'delete', oedit.id);
+  if (!r.ok) return toast('Não foi possível remover agora: ' + r.error.message);
   await loadOrcs(); editarOrc(null); listarOrc(); render(); if ($('#dpn').open) painel();
 }
 
@@ -1247,12 +1378,15 @@ function editarCartao(c) {
 async function salvarCartao(ev) {
   ev.preventDefault();
   const row = { id: kedit?.id || crypto.randomUUID(), nome: $('#knome').value.trim(), dia_fechamento: +$('#kfech').value, dia_vencimento: +$('#kven').value, conta_id: $('#kconta').value || null };
-  const { error } = await sb.from('cartoes').upsert(row);
-  if (error) return toast('Não foi possível salvar o cartão agora. Verifique a conexão.');
+  const r = await gravaTab('cartoes', 'upsert', row);
+  if (!r.ok) return toast('Não foi possível salvar o cartão agora: ' + r.error.message);
+  if (r.offline) toast('Sem conexão: salvo no aparelho e enviado quando voltar.');
   await loadCartoes(); editarCartao(null); listarCartoes(); loadLans();
 }
 async function excluirCartao() {
-  if (!kedit || !confirm('Excluir o cartão "' + kedit.nome + '"? Isso apaga também as compras e as faturas dele.')) return;
+  if (!kedit) return;
+  if (!navigator.onLine) return toast('Para excluir um cartão é preciso estar com internet.');
+  if (!confirm('Excluir o cartão "' + kedit.nome + '"? Isso apaga também as compras e as faturas dele.')) return;
   const { error } = await sb.from('cartoes').delete().eq('id', kedit.id);
   if (error) return toast('Não foi possível excluir agora.');
   await loadCartoes(); await loadLans(); editarCartao(null); listarCartoes();
@@ -1281,12 +1415,15 @@ function editarConta(c) {
 async function salvarConta(ev) {
   ev.preventDefault();
   const row = { id: cedit?.id || crypto.randomUUID(), nome: $('#cnome').value.trim(), saldo_inicial_centavos: parseSaldo($('#csal').value) };
-  const { error } = await sb.from('contas').upsert(row);
-  if (error) return toast('Não foi possível salvar a conta agora. Verifique a conexão.');
+  const r = await gravaTab('contas', 'upsert', row);
+  if (!r.ok) return toast('Não foi possível salvar a conta agora: ' + r.error.message);
+  if (r.offline) toast('Sem conexão: salva no aparelho e enviada quando voltar.');
   await loadContas(); editarConta(null); listarContas(); render();
 }
 async function excluirConta() {
-  if (!cedit || !confirm('Excluir a conta "' + cedit.nome + '"? Os lançamentos ficam, mas sem conta.')) return;
+  if (!cedit) return;
+  if (!navigator.onLine) return toast('Para excluir uma conta é preciso estar com internet.');
+  if (!confirm('Excluir a conta "' + cedit.nome + '"? Os lançamentos ficam, mas sem conta.')) return;
   const { error } = await sb.from('contas').delete().eq('id', cedit.id);
   if (error) return toast('Não foi possível excluir agora.');
   await loadContas(); await loadLans(); editarConta(null); listarContas();
@@ -1305,9 +1442,10 @@ function tempoReal() {
 }
 
 async function entrar(user) {
-  uid = user.id;
+  uid = user.id; guardaLS('cf_uid', uid);
   $('#login').hidden = true; $('#app').hidden = false; $('#novo').hidden = false;
-  await flush(); await loadCats(); await loadContas(); await loadCartoes(); await loadOrcs(); await loadMetas(); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
+  doCache();
+  await flush(); await Promise.all([loadCats(), loadContas(), loadCartoes(), loadOrcs(), loadMetas()]); await loadLans(); gerarFixos(); tempoReal(); lembrarBackup();
 }
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
@@ -1365,7 +1503,7 @@ $('#snc').onclick = () => $('#dsn').close();
 $('#fsn').onsubmit = salvarSenha;
 $('#fl').onsubmit = e => { e.preventDefault(); auth(false); };
 $('#cad').onclick = () => auth(true);
-$('#sair').onclick = async () => { await sb.auth.signOut(); sair(); };
+$('#sair').onclick = async () => { try { await sb.auth.signOut(navigator.onLine ? undefined : { scope: 'local' }); } catch {} localStorage.removeItem('cf_uid'); sair(); };
 $('#ant').onclick = () => { mes = addMes(mes, -1); render(); };
 $('#prox').onclick = () => { mes = addMes(mes, 1); render(); };
 $('#bcontas').onclick = () => { editarConta(null); listarContas(); $('#dc').showModal(); };
@@ -1435,13 +1573,21 @@ $('#exc').onclick = excluir;
 $('#fd').onsubmit = salvar;
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setTipo(b.dataset.t));
 $('#rep').onchange = () => { pcmudou(); const p = $('#rep').value === 'p'; $('#np').hidden = !p; $('#lv').textContent = p ? 'Valor de cada parcela (R$)' : 'Valor (R$)'; };
-window.addEventListener('online', async () => { await flush(); loadLans(); });
+window.addEventListener('online', () => { atualizaOff(); sincronizar(true); });
+window.addEventListener('offline', atualizaOff);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && uid && navigator.onLine && pendentes()) sincronizar(); });
+setInterval(() => { if (uid && navigator.onLine && pendentes()) sincronizar(); }, 60000);
+$('#offb').onclick = () => { if (navigator.onLine) sincronizar(true, true); else toast('Sem internet no momento. As alterações ficam guardadas e serão enviadas quando a conexão voltar.'); };
 
 iconizar();
 (async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) { entrar(session.user); if (RECUP) abrirSenha(true); } else sair();
+  let session = null, semRede = false;
+  try { const r = await sb.auth.getSession(); session = r.data.session; semRede = !session && !!r.error && ehRede(r.error); } catch { semRede = true; }
+  const salvo = localStorage.getItem('cf_uid');
+  if (session) { entrar(session.user); if (RECUP) abrirSenha(true); }
+  else if ((!navigator.onLine || semRede) && salvo) entrar({ id: salvo });   // sem internet: usa os dados guardados no aparelho
+  else { sair(); if (!navigator.onLine) { $('#msg').style.color = ''; $('#msg').textContent = 'Sem internet. Para entrar neste aparelho pela primeira vez é preciso estar conectado.'; } }
 })();
 </script>
 </body>
