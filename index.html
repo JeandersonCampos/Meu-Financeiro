@@ -50,7 +50,7 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 .acts .ok{background:var(--pri);color:var(--onpri);border-color:var(--pri);font-weight:600}
 .acts .del{color:var(--out)}
 #login{max-width:380px;margin:12vh auto 0;padding:0 20px}
-#login h1{font-size:1.6rem;margin:0 0 4px}
+#login h1{font-size:1.6rem;margin:0 0 14px}
 #login p{color:var(--mut);margin:0 0 12px}
 #msg{min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--out)}
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;display:none}
@@ -86,6 +86,8 @@ input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-ra
 dialog h2{display:flex;align-items:center;gap:8px}
 .ck{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:.95rem}
 .ck input{width:20px;height:20px;flex:none}
+.esq{display:block;margin:14px auto 0;border:0;background:none;color:var(--pri);text-decoration:underline;font-size:.9rem}
+#login .rodape{margin:34px 0 0;text-align:center;color:var(--mut);font-size:.8rem}
 </style>
 </head>
 <body>
@@ -93,13 +95,14 @@ dialog h2{display:flex;align-items:center;gap:8px}
 <section id="login">
   <img src="logo.svg" alt="" width="72" height="72" style="border-radius:18px;margin-bottom:14px;display:block">
   <h1>Meu Financeiro</h1>
-  <p>Entre para ver seus dados em qualquer aparelho. <small>(versão 20)</small></p>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
     <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
     <div class="acts"><button type="button" id="cad">Criar conta</button><button class="ok">Entrar</button></div>
+    <button type="button" class="esq" id="esq">Esqueci minha senha</button>
     <div id="msg" role="alert"></div>
   </form>
+  <p class="rodape">Desenvolvido por Jcampos · versão 22</p>
 </section>
 
 <main id="app" hidden>
@@ -130,6 +133,7 @@ dialog h2{display:flex;align-items:center;gap:8px}
     <button class="ac" id="bcart"><span class="ib" data-i="card" data-s="22"></span>Cartões</button>
     <button class="ac" id="bcat2"><span class="ib" data-i="tag" data-s="22"></span>Categorias</button>
     <button class="ac" id="bbk"><span class="ib" data-i="backup" data-s="22"></span>Backup</button>
+    <button class="ac" id="bsenha"><span class="ib" data-i="key" data-s="22"></span>Senha</button>
   </div>
   <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
   <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
@@ -193,6 +197,17 @@ dialog h2{display:flex;align-items:center;gap:8px}
     <button type="button" id="bkfechar">Fechar</button>
   </div>
   <input type="file" id="arq" accept=".json,.csv,text/csv,application/json" hidden>
+</dialog>
+<dialog id="dsn">
+  <form id="fsn">
+    <h2><span data-i="key" data-s="20"></span> <span id="snt">Alterar senha</span></h2>
+    <p id="snp" hidden style="margin:0 0 6px;color:var(--mut);font-size:.9rem">Você entrou pelo link enviado ao seu e-mail. Defina agora a sua nova senha.</p>
+    <label for="sna" id="lsna">Senha atual</label><input id="sna" type="password" autocomplete="current-password">
+    <label for="snn">Nova senha (mínimo 6 caracteres)</label><input id="snn" type="password" autocomplete="new-password">
+    <label for="snr">Repita a nova senha</label><input id="snr" type="password" autocomplete="new-password">
+    <div id="snmsg" role="alert" style="min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--out)"></div>
+    <div class="acts"><button type="button" id="snc">Cancelar</button><button class="ok">Salvar senha</button></div>
+  </form>
 </dialog>
 <dialog id="dfl">
   <h2><span data-i="sliders" data-s="20"></span> Filtros</h2>
@@ -295,7 +310,9 @@ const falha = typeof supabase === 'undefined'
       : '';
 if (falha) { erro(falha); parou = true; throw new Error(falha); }
 
+const RECUP = /type=recovery/.test(location.hash);
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+sb.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') setTimeout(() => abrirSenha(true), 0); });
 const $ = s => document.querySelector(s);
 const ICONS = {
   chart: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
@@ -320,7 +337,8 @@ const ICONS = {
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
   check: '<path d="M5 12l5 5 9-10"/>',
   landmark: '<path d="M3 21h18"/><path d="M5 21V10M10 21V10M14 21V10M19 21V10"/><path d="M12 3l9 5H3z"/>',
-  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M17 6l3 3"/><path d="M14 9l2 2"/>'
 };
 const ico = (n, s = 20) => '<svg class="i" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
 const iconizar = () => document.querySelectorAll('[data-i]').forEach(e => { if (!e.firstChild || e.firstChild.nodeType !== 1 || e.firstChild.tagName !== 'svg') e.insertAdjacentHTML('afterbegin', ico(e.dataset.i, +e.dataset.s || 18)); });
@@ -1294,8 +1312,46 @@ async function entrar(user) {
 
 function sair() { $('#app').hidden = true; $('#novo').hidden = true; $('#login').hidden = false; }
 
+async function esqueciSenha() {
+  const m = $('#msg'), em = $('#em'), email = em.value.trim();
+  if (!email || !em.validity.valid) { m.style.color = ''; m.textContent = 'Digite seu e-mail no campo acima e toque em "Esqueci minha senha".'; em.focus(); return; }
+  if (!navigator.onLine) { m.style.color = ''; m.textContent = 'Sem conexão. Conecte-se à internet para recuperar a senha.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) { m.style.color = ''; m.textContent = 'Não foi possível enviar o e-mail: ' + error.message; return; }
+  m.style.color = 'var(--pri)'; m.textContent = 'Se este e-mail tiver cadastro, enviamos um link para redefinir a senha. Confira também a caixa de spam.';
+}
+
+let senhaRecup = false;
+function abrirSenha(recup) {
+  if ($('#dsn').open) return;
+  senhaRecup = !!recup;
+  $('#sna').value = $('#snn').value = $('#snr').value = ''; $('#snmsg').textContent = '';
+  $('#lsna').hidden = $('#sna').hidden = senhaRecup; $('#snp').hidden = !senhaRecup;
+  $('#snt').textContent = senhaRecup ? 'Definir nova senha' : 'Alterar senha';
+  $('#dsn').showModal();
+}
+async function salvarSenha(ev) {
+  ev.preventDefault();
+  const m = $('#snmsg'), atual = $('#sna').value, nova = $('#snn').value, rep = $('#snr').value, erroS = t => { m.textContent = t; };
+  if (!senhaRecup && !atual) return erroS('Digite a senha atual.');
+  if (nova.length < 6) return erroS('A nova senha precisa ter pelo menos 6 caracteres.');
+  if (nova !== rep) return erroS('As duas senhas novas não são iguais.');
+  if (!senhaRecup && nova === atual) return erroS('A nova senha precisa ser diferente da atual.');
+  if (!navigator.onLine) return erroS('Sem conexão. Conecte-se à internet para alterar a senha.');
+  m.textContent = '';
+  if (!senhaRecup) {
+    const { data: u } = await sb.auth.getUser();
+    const { error: e1 } = await sb.auth.signInWithPassword({ email: u?.user?.email || '', password: atual });
+    if (e1) return erroS('A senha atual não confere.');
+  }
+  const { error } = await sb.auth.updateUser({ password: nova });
+  if (error) return erroS(/different|same/i.test(error.message) ? 'A nova senha precisa ser diferente da atual.' : 'Não foi possível alterar a senha: ' + error.message);
+  $('#dsn').close(); toast('Senha alterada com sucesso.');
+}
+
 async function auth(criar) {
   const f = $('#fl'); if (!f.reportValidity()) return;
+  $('#msg').style.color = '';
   const cred = { email: $('#em').value.trim(), password: $('#pw').value };
   const { data, error } = criar ? await sb.auth.signUp(cred) : await sb.auth.signInWithPassword(cred);
   if (error) { $('#msg').textContent = 'Não foi possível entrar: ' + error.message; return; }
@@ -1303,6 +1359,10 @@ async function auth(criar) {
   else $('#msg').textContent = 'Conta criada. Confirme pelo e-mail que enviamos e depois toque em Entrar.';
 }
 
+$('#esq').onclick = esqueciSenha;
+$('#bsenha').onclick = () => abrirSenha(false);
+$('#snc').onclick = () => $('#dsn').close();
+$('#fsn').onsubmit = salvarSenha;
 $('#fl').onsubmit = e => { e.preventDefault(); auth(false); };
 $('#cad').onclick = () => auth(true);
 $('#sair').onclick = async () => { await sb.auth.signOut(); sair(); };
@@ -1381,7 +1441,7 @@ iconizar();
 (async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   const { data: { session } } = await sb.auth.getSession();
-  session ? entrar(session.user) : sair();
+  if (session) { entrar(session.user); if (RECUP) abrirSenha(true); } else sair();
 })();
 </script>
 </body>
