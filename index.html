@@ -91,6 +91,13 @@ dialog h2{display:flex;align-items:center;gap:8px}
 :root{--warnbg:#8a5a00;--onwarn:#fff}
 @media(prefers-color-scheme:dark){:root{--warnbg:#e0b44c;--onwarn:#1b1b1b}}
 .offb{display:block;width:100%;margin:0 0 8px;padding:9px 12px;border:0;border-radius:10px;background:var(--warnbg);color:var(--onwarn);font-size:.85rem;text-align:left}
+.senhabox{position:relative}
+.senhabox input{padding-right:46px}
+.ver{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;color:var(--mut);display:grid;place-items:center;border-radius:10px}
+.hero{position:relative}
+.olho{position:absolute;right:10px;top:10px;width:42px;height:42px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center}
+body.oculto .num{filter:blur(8px);user-select:none}
+body.oculto .hero .big.num{filter:blur(11px)}
 </style>
 </head>
 <body>
@@ -100,12 +107,12 @@ dialog h2{display:flex;align-items:center;gap:8px}
   <h1>Meu Financeiro</h1>
   <form id="fl">
     <label for="em">E-mail</label><input id="em" type="email" autocomplete="email" required>
-    <label for="pw">Senha (mínimo 6 caracteres)</label><input id="pw" type="password" autocomplete="current-password" minlength="6" required>
+    <label for="pw">Senha (mínimo 6 caracteres)</label><div class="senhabox"><input id="pw" type="password" autocomplete="current-password" minlength="6" required><button type="button" class="ver" data-alvo="pw" aria-label="Mostrar senha"></button></div>
     <div class="acts"><button type="button" id="cad">Criar conta</button><button class="ok">Entrar</button></div>
     <button type="button" class="esq" id="esq">Esqueci minha senha</button>
     <div id="msg" role="alert"></div>
   </form>
-  <p class="rodape">Desenvolvido por Jcampos · versão 23</p>
+  <p class="rodape">Desenvolvido por Jcampos · versão 24</p>
 </section>
 
 <main id="app" hidden>
@@ -120,7 +127,7 @@ dialog h2{display:flex;align-items:center;gap:8px}
     <button id="lembt" type="button" style="width:100%;text-align:left;padding:12px 14px;border:0;background:none;font-weight:600;display:flex;align-items:center;gap:6px"></button>
     <div id="lembl"></div>
   </div>
-  <div class="hero"><small>Saldo previsto no fim do mês</small><div class="big num" id="res"></div><small>Realizado até agora: <span class="num" id="real"></span></small></div>
+  <div class="hero"><button type="button" class="olho" id="olho" aria-label="Ocultar valores" aria-pressed="false"></button><small>Saldo previsto no fim do mês</small><div class="big num" id="res"></div><small>Realizado até agora: <span class="num" id="real"></span></small></div>
   <div class="duo">
     <div><small><span data-i="landmark" data-s="15"></span> Saldo inicial</small><b class="num" id="sini"></b></div>
     <div><small><span data-i="activity" data-s="15"></span> Resultado do mês</small><b class="num" id="sres"></b></div>
@@ -140,7 +147,7 @@ dialog h2{display:flex;align-items:center;gap:8px}
     <button class="ac" id="bsenha"><span class="ib" data-i="key" data-s="22"></span>Senha</button>
   </div>
   <button class="link" id="orcl" hidden style="margin:0 0 6px;text-decoration:none;color:var(--out);font-size:.9rem;text-align:left"></button>
-  <p id="fatl" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
+  <p id="fatl" class="num" style="margin:0 0 12px;font-size:.9rem;color:var(--mut)" hidden></p>
   <div class="fbar">
     <div class="busca"><span data-i="search" data-s="18"></span><input id="fq" type="search" placeholder="Buscar lançamentos" aria-label="Buscar lançamentos" autocomplete="off"></div>
     <button class="fbtn" id="fbtn" type="button" aria-label="Mais filtros"><span data-i="sliders" data-s="20"></span><em id="fcount" hidden></em></button>
@@ -206,9 +213,9 @@ dialog h2{display:flex;align-items:center;gap:8px}
   <form id="fsn">
     <h2><span data-i="key" data-s="20"></span> <span id="snt">Alterar senha</span></h2>
     <p id="snp" hidden style="margin:0 0 6px;color:var(--mut);font-size:.9rem">Você entrou pelo link enviado ao seu e-mail. Defina agora a sua nova senha.</p>
-    <label for="sna" id="lsna">Senha atual</label><input id="sna" type="password" autocomplete="current-password">
-    <label for="snn">Nova senha (mínimo 6 caracteres)</label><input id="snn" type="password" autocomplete="new-password">
-    <label for="snr">Repita a nova senha</label><input id="snr" type="password" autocomplete="new-password">
+    <label for="sna" id="lsna">Senha atual</label><div class="senhabox"><input id="sna" type="password" autocomplete="current-password"><button type="button" class="ver" data-alvo="sna" aria-label="Mostrar senha"></button></div>
+    <label for="snn">Nova senha (mínimo 6 caracteres)</label><div class="senhabox"><input id="snn" type="password" autocomplete="new-password"><button type="button" class="ver" data-alvo="snn" aria-label="Mostrar senha"></button></div>
+    <label for="snr">Repita a nova senha</label><div class="senhabox"><input id="snr" type="password" autocomplete="new-password"><button type="button" class="ver" data-alvo="snr" aria-label="Mostrar senha"></button></div>
     <div id="snmsg" role="alert" style="min-height:1.4em;margin-top:10px;font-size:.9rem;color:var(--out)"></div>
     <div class="acts"><button type="button" id="snc">Cancelar</button><button class="ok">Salvar senha</button></div>
   </form>
@@ -346,6 +353,8 @@ const ICONS = {
   check: '<path d="M5 12l5 5 9-10"/>',
   landmark: '<path d="M3 21h18"/><path d="M5 21V10M10 21V10M14 21V10M19 21V10"/><path d="M12 3l9 5H3z"/>',
   activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.5 0-10-7-10-7a17.7 17.7 0 0 1 4.1-5.2"/><path d="M9.9 5.2A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17.8 17.8 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M17 6l3 3"/><path d="M14 9l2 2"/>'
 };
 const ico = (n, s = 20) => '<svg class="i" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[n] || '') + '</svg>';
@@ -1147,7 +1156,7 @@ function listarMetas() {
     const a = document.createElement('span'); a.textContent = m.nome;
     const v = document.createElement('b'); v.className = 'num'; v.textContent = fmt(g) + ' de ' + fmt(m.alvo_centavos) + ' · ' + pct + '%'; b.append(a, v); b.onclick = () => editarMeta(m);
     const tr = document.createElement('div'); tr.className = 'tr'; const f = document.createElement('div'); f.className = pct >= 100 ? 'i' : 'c'; f.style.width = Math.max(0, Math.min(100, pct)) + '%'; tr.append(f);
-    const s = document.createElement('small'); s.style.color = 'var(--mut)';
+    const s = document.createElement('small'); s.style.color = 'var(--mut)'; s.className = 'num';
     if (g >= m.alvo_centavos) s.textContent = 'Meta atingida!';
     else {
       s.textContent = 'Faltam ' + fmt(m.alvo_centavos - g);
@@ -1273,8 +1282,8 @@ function svgSaldo(saldo) {
     + '<line x1="0" x2="' + W + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="var(--line)" stroke-dasharray="4"/>'
     + '<polyline fill="none" stroke="var(--pri)" stroke-width="2.5" points="' + saldo.map((v, i) => x(i) + ',' + y(v)).join(' ') + '"/>'
     + saldo.map((v, i) => '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3" fill="var(--pri)"/>').join('')
-    + '<text x="2" y="10" font-size="10" fill="var(--mut)">' + fmt(hi) + '</text>'
-    + (lo < 0 ? '<text x="2" y="' + (H - pb - 2) + '" font-size="10" fill="var(--mut)">' + fmt(lo) + '</text>' : '');
+    + '<text class="num" x="2" y="10" font-size="10" fill="var(--mut)">' + fmt(hi) + '</text>'
+    + (lo < 0 ? '<text class="num" x="2" y="' + (H - pb - 2) + '" font-size="10" fill="var(--mut)">' + fmt(lo) + '</text>' : '');
   MESES.forEach((c, i) => s += '<text x="' + x(i) + '" y="' + (H - 4) + '" font-size="10" text-anchor="middle" fill="var(--mut)">' + c + '</text>');
   return s + '</svg>';
 }
@@ -1464,6 +1473,7 @@ function abrirSenha(recup) {
   if ($('#dsn').open) return;
   senhaRecup = !!recup;
   $('#sna').value = $('#snn').value = $('#snr').value = ''; $('#snmsg').textContent = '';
+  document.querySelectorAll('#dsn .ver').forEach(b => mostraSenha(b, false));
   $('#lsna').hidden = $('#sna').hidden = senhaRecup; $('#snp').hidden = !senhaRecup;
   $('#snt').textContent = senhaRecup ? 'Definir nova senha' : 'Alterar senha';
   $('#dsn').showModal();
@@ -1579,6 +1589,16 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && ui
 setInterval(() => { if (uid && navigator.onLine && pendentes()) sincronizar(); }, 60000);
 $('#offb').onclick = () => { if (navigator.onLine) sincronizar(true, true); else toast('Sem internet no momento. As alterações ficam guardadas e serão enviadas quando a conexão voltar.'); };
 
+// olho da senha (login e troca de senha)
+const mostraSenha = (b, ver) => { const i = $('#' + b.dataset.alvo); i.type = ver ? 'text' : 'password'; b.innerHTML = ico(ver ? 'eyeOff' : 'eye', 20); b.setAttribute('aria-label', ver ? 'Ocultar senha' : 'Mostrar senha'); };
+document.querySelectorAll('.ver').forEach(b => { mostraSenha(b, false); b.onclick = () => mostraSenha(b, $('#' + b.dataset.alvo).type === 'password'); });
+// olho dos valores: esconde todos os valores em R$ da tela (a escolha fica guardada neste aparelho)
+const aplicaOculto = on => {
+  document.body.classList.toggle('oculto', on);
+  const b = $('#olho'); b.innerHTML = ico(on ? 'eyeOff' : 'eye', 22); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Mostrar valores' : 'Ocultar valores');
+};
+aplicaOculto(localStorage.getItem('cf_oculto') === '1');
+$('#olho').onclick = () => { const on = !document.body.classList.contains('oculto'); aplicaOculto(on); guardaLS('cf_oculto', on ? '1' : '0'); };
 iconizar();
 (async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
